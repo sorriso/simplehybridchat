@@ -1,0 +1,20 @@
+<testsuites id="" name="" tests="6" failures="0" skipped="0" errors="0" time="22.918834">
+<testsuite name="tests/e2e/user-journey_spec_e2e.ts" timestamp="2025-11-27T09:47:03.478Z" hostname="chromium" tests="2" failures="0" skipped="0" time="2.977" errors="0">
+<testcase name="User Journey E2E › loads the application homepage" classname="tests/e2e/user-journey_spec_e2e.ts" time="1.919">
+</testcase>
+<testcase name="User Journey E2E › can navigate to login page" classname="tests/e2e/user-journey_spec_e2e.ts" time="1.058">
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/user-journey_spec_e2e.ts" timestamp="2025-11-27T09:47:03.478Z" hostname="firefox" tests="2" failures="0" skipped="0" time="5.425" errors="0">
+<testcase name="User Journey E2E › loads the application homepage" classname="tests/e2e/user-journey_spec_e2e.ts" time="2.997">
+</testcase>
+<testcase name="User Journey E2E › can navigate to login page" classname="tests/e2e/user-journey_spec_e2e.ts" time="2.428">
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/user-journey_spec_e2e.ts" timestamp="2025-11-27T09:47:03.478Z" hostname="webkit" tests="2" failures="0" skipped="0" time="4.759" errors="0">
+<testcase name="User Journey E2E › loads the application homepage" classname="tests/e2e/user-journey_spec_e2e.ts" time="2.884">
+</testcase>
+<testcase name="User Journey E2E › can navigate to login page" classname="tests/e2e/user-journey_spec_e2e.ts" time="1.875">
+</testcase>
+</testsuite>
+</testsuites>
