@@ -1,0 +1,23 @@
+# Testing dependencies
+# Path: requirements-test.txt
+# Version: 5
+
+# Core testing
+pytest==9.0.1
+pytest-asyncio==1.3.0
+pytest-cov==7.0.0
+pytest-mock==3.15.1
+pytest-env==1.2.0
+pytest-xdist==3.6.1
+
+# Testcontainers for integration tests
+testcontainers[arangodb]==4.13.3
+testcontainers==4.13.3
+
+# HTTP testing
+httpx==0.28.1
+requests==2.32.5
+
+# Test utilities
+faker==38.2.0
+freezegun==1.5.5
