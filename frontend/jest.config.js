@@ -1,4 +1,4 @@
-// path: jest.config.js
+// path: frontend/jest.config.js
 // version: 8 - Excluded MSWProvider and mocks from coverage
 
 module.exports = {

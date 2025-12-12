@@ -1,5 +1,5 @@
 """
-Path: tests/unit/api/test_deps.py
+Path: backend/tests/unit/api/test_deps.py
 Version: 1
 
 Unit tests for FastAPI dependencies

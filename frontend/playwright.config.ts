@@ -1,4 +1,4 @@
-// path: playwright.config.ts
+// path: frontend/playwright.config.ts
 // version: 2 - Fixed test directory and reporter output folder
 
 import { defineConfig, devices } from '@playwright/test'

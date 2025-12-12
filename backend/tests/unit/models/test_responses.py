@@ -1,5 +1,5 @@
 """
-Path: tests/unit/models/test_responses.py
+Path: backend/tests/unit/models/test_responses.py
 Version: 1
 
 Unit tests for API response wrappers

@@ -1,5 +1,5 @@
 """
-Path: tests/integration/fixtures/session_containers.py
+Path: backend/tests/integration/fixtures/session_containers.py
 Version: 1
 
 Session-scoped containers for maximum speed

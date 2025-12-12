@@ -1,4 +1,4 @@
-/* path: src/components/ui/Input.tsx
+/* path: frontend/src/components/ui/Input.tsx
    version: 2 */
 
 import { InputHTMLAttributes, forwardRef, useId } from "react";

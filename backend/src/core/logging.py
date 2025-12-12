@@ -1,5 +1,5 @@
 """
-Path: src/core/logging.py
+Path: backend/src/core/logging.py
 Version: 2
 
 Logging configuration

@@ -1,5 +1,5 @@
 """
-Path: src/storage/factory.py
+Path: backend/src/storage/factory.py
 Version: 1
 
 Storage factory pattern implementation

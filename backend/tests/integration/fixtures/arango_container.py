@@ -1,5 +1,5 @@
 """
-Path: tests/integration/fixtures/arango_container.py
+Path: backend/tests/integration/fixtures/arango_container.py
 Version: 4 - IP retry fix for empty container IP
 
 Changes in v4:

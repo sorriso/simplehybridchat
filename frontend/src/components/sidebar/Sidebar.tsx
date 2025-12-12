@@ -1,4 +1,4 @@
-/* path: src/components/sidebar/Sidebar.tsx
+/* path: frontend/src/components/sidebar/Sidebar.tsx
    version: 4 - Fixed null groupId handling for ungrouping */
 
 import { useState } from "react";

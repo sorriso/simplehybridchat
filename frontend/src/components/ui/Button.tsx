@@ -1,4 +1,4 @@
-/* path: src/components/ui/Button.tsx
+/* path: frontend/src/components/ui/Button.tsx
    version: 2 */
 
 import { ButtonHTMLAttributes, forwardRef } from "react";

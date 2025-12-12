@@ -1,4 +1,4 @@
-/* path: src/types/file.ts
+/* path: frontend/src/types/file.ts
    version: 1 */
 
 /**

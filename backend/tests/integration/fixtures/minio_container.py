@@ -1,5 +1,5 @@
 """
-Path: tests/integration/fixtures/minio_container.py
+Path: backend/tests/integration/fixtures/minio_container.py
 Version: 1
 
 MinIO testcontainer fixtures

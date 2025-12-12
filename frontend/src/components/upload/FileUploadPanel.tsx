@@ -1,4 +1,4 @@
-/* path: src/components/upload/FileUploadPanel.tsx
+/* path: frontend/src/components/upload/FileUploadPanel.tsx
    version: 1 */
 
 import { X } from "lucide-react";

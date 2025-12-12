@@ -1,4 +1,4 @@
-/* path: src/components/sharing/ShareConversationModal.tsx
+/* path: frontend/src/components/sharing/ShareConversationModal.tsx
    version: 1 */
 
 import { useState } from "react";

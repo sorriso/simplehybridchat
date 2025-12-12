@@ -1,5 +1,5 @@
 """
-Path: src/services/__init__.py
+Path: backend/src/services/__init__.py
 Version: 2
 
 Services package

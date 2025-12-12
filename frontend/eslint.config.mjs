@@ -1,3 +1,6 @@
+// path : frontend/eslint.config.mjs
+// version : 1
+
 import js from '@eslint/js';
 import typescript from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';

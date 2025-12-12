@@ -1,5 +1,5 @@
 """
-Path: tests/integration/database/__init__.py
+Path: backend/tests/integration/database/__init__.py
 Version: 1.0
 
 Database integration tests

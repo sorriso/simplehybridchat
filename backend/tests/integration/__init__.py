@@ -1,5 +1,5 @@
 """
-Path: tests/integration/__init__.py
+Path: backend/tests/integration/__init__.py
 Version: 1.0
 
 Integration tests package

@@ -1,4 +1,4 @@
-// path: src/mocks/browser.ts
+// path: frontend/src/mocks/browser.ts
 // version: 4 - WITH SSE handlers imported
 
 import { setupWorker } from "msw";

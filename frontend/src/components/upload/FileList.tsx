@@ -1,4 +1,4 @@
-/* path: src/components/upload/FileList.tsx
+/* path: frontend/src/components/upload/FileList.tsx
    version: 1 */
 
 import { FileText, X, CheckCircle, AlertCircle, Loader } from "lucide-react";

@@ -1,5 +1,5 @@
 """
-Path: src/database/factory.py
+Path: backend/src/database/factory.py
 Version: 1.0
 
 Database factory pattern implementation

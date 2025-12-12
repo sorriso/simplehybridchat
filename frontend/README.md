@@ -1,4 +1,4 @@
-# path: ./README.md
+# path: frontend/./README.md
 # version: 1
 
 # AI Chatbot Frontend

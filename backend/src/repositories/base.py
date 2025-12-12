@@ -1,5 +1,5 @@
 """
-Path: src/repositories/base.py
+Path: backend/src/repositories/base.py
 Version: 1
 
 Base repository with generic CRUD operations

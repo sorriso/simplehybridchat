@@ -1,4 +1,4 @@
-/* path: src/types/settings.ts
+/* path: frontend/src/types/settings.ts
    version: 1 */
 
 /**

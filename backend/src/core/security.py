@@ -1,5 +1,5 @@
 """
-Path: src/core/security.py
+Path: backend/src/core/security.py
 Version: 2
 
 Security utilities for authentication

@@ -1,4 +1,4 @@
-/* path: src/components/maintenance/MaintenancePage.tsx
+/* path: frontend/src/components/maintenance/MaintenancePage.tsx
    version: 1 */
 
 import { Wrench } from "lucide-react";

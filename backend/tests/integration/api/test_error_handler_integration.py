@@ -1,5 +1,5 @@
 """
-Path: tests/integration/api/test_error_handler_integration.py
+Path: backend/tests/integration/api/test_error_handler_integration.py
 Version: 3
 
 Integration tests for error handler middleware with FastAPI

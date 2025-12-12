@@ -1,5 +1,5 @@
-// path: jest.setup.js
-// version: 7 - Removed window.location mock (handled in individual tests)
+// path: frontend/jest.setup.js
+// version: 7
 
 // Add fetch polyfill FIRST (required for MSW and API calls in tests)
 // Node.js doesn't have fetch natively, so we need to polyfill it

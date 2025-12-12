@@ -1,5 +1,5 @@
 """
-Path: tests/unit/repositories/test_user_repository.py
+Path: backend/tests/unit/repositories/test_user_repository.py
 Version: 2
 
 Changes in v2:

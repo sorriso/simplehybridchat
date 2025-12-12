@@ -1,11 +1,21 @@
 """
-Path: tests/integration/api/test_auth_routes_integration.py
-Version: 5
+Path: backend/tests/integration/api/test_auth_routes_integration.py
+Version: 7.0
+
+Changes in v7.0:
+- FIX: Use ["data"] instead of ["user"] for /auth/me responses
+- Route /auth/me returns SuccessResponse format {success, data}
+
+Changes in v6.0:
+- FRONTEND COMPATIBILITY: Updated for new auth response formats
+- /login returns {token, user} instead of {success, data: {accessToken, ...}}
+- /config returns {config: {...}} instead of {success, data: {...}}
+- /verify and /me return {user: {...}} instead of {success, data: {...}}
 
 Integration tests for authentication routes
 
 Changes in v5:
-- Fixed cleanup: existing["_key"] → existing["id"]
+- Fixed cleanup: existing["_key"] â†’ existing["id"]
 - Final cleanup of remaining _key references
 
 Changes in v4:
@@ -50,8 +60,8 @@ def client(arango_container_function):
         "password_hash": hash_password("RootPass123"),
         "role": "root",
         "status": "active",
-        "created_at": datetime.utcnow(),
-        "updated_at": None
+        "createdAt": datetime.utcnow(),
+        "updatedAt": None
     }
     
     # Delete if exists (cleanup from previous test)
@@ -147,14 +157,12 @@ class TestAuthRoutesIntegration:
         
         assert response.status_code == 200
         
-        # STRUCTURE: {"success": true, "data": {"access_token": "...", ...}, ...}
+        # STRUCTURE: {"token": "...", "user": {...}}
         json_response = response.json()
-        assert "data" in json_response
-        data = json_response["data"]
-        
-        assert "access_token" in data
-        assert data["token_type"] == "bearer"
-        assert "expires_in" in data
+        assert "token" in json_response
+        assert "user" in json_response
+        assert len(json_response["token"]) > 0
+        assert json_response["user"]["email"] == "login@example.com"
     
     def test_login_wrong_password(self, client):
         """Test login with wrong password"""
@@ -199,7 +207,7 @@ class TestAuthRoutesIntegration:
         })
         
         # Extract token correctly
-        token = login_response.json()["data"]["access_token"]
+        token = login_response.json()["token"]
         
         # Get own profile
         response = client.get(
@@ -226,7 +234,7 @@ class TestAuthRoutesIntegration:
         })
         
         # Extract token correctly
-        token = login_response.json()["data"]["access_token"]
+        token = login_response.json()["token"]
         
         # Logout
         response = client.post(
@@ -250,7 +258,7 @@ class TestAuthRoutesIntegration:
             "password": "OldPass123"
         })
         
-        token = login_response.json()["data"]["access_token"]
+        token = login_response.json()["token"]
         
         # Change password
         response = client.post(
@@ -285,7 +293,7 @@ class TestAuthRoutesIntegration:
             "password": "CorrectPass123"
         })
         
-        token = login_response.json()["data"]["access_token"]
+        token = login_response.json()["token"]
         
         # Try to change with wrong current password
         response = client.post(
@@ -304,11 +312,11 @@ class TestAuthRoutesIntegration:
         response = client.get("/api/auth/config")
         
         assert response.status_code == 200
-        data = response.json()["data"]
+        config = response.json()["config"]
         
-        assert "auth_mode" in data
-        assert "allow_registration" in data
-        assert "sso_enabled" in data
+        assert "mode" in config
+        assert config["mode"] in ["none", "local", "sso"]
+        assert "maintenanceMode" in config
 
 
 @pytest.mark.integration
@@ -331,7 +339,7 @@ class TestAuthFlow:
             "password": "StrongPass123"
         })
         assert login_response.status_code == 200
-        token = login_response.json()["data"]["access_token"]
+        token = login_response.json()["token"]
         
         # 3. Authenticated request (get own profile)
         profile_response = client.get(

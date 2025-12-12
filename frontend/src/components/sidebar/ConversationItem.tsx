@@ -1,4 +1,4 @@
-/* path: src/components/sidebar/ConversationItem.tsx
+/* path: frontend/src/components/sidebar/ConversationItem.tsx
    version: 4 - Enhanced selected item visibility */
 
 import { MessageSquare, Trash2, Edit2, GripVertical } from "lucide-react";

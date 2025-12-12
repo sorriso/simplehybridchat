@@ -1,4 +1,4 @@
-/* path: src/components/ui/ContextMenu.tsx
+/* path: frontend/src/components/ui/ContextMenu.tsx
    version: 2 */
 
 import { ReactNode, useEffect, useRef, useState, useCallback } from "react";

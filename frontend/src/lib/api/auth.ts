@@ -1,4 +1,4 @@
-/* path: src/lib/api/auth.ts
+/* path: frontend/src/lib/api/auth.ts
    version: 1 */
 
 import { apiClient } from "./client";

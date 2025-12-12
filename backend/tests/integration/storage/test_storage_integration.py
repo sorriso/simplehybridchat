@@ -1,5 +1,5 @@
 """
-Path: tests/integration/storage/test_storage_integration.py
+Path: backend/tests/integration/storage/test_storage_integration.py
 Version: 1
 
 Integration tests for MinIO storage with testcontainers

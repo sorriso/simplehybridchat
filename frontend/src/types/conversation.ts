@@ -1,4 +1,4 @@
-/* path: src/types/conversation.ts
+/* path: frontend/src/types/conversation.ts
    version: 1 */
 
 export interface Message {

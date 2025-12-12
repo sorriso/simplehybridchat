@@ -1,4 +1,4 @@
-/* path: src/components/auth/LoginForm.tsx
+/* path: frontend/src/components/auth/LoginForm.tsx
    version: 5 - Fixed onLogin type to return Promise<User> and removed icon prop */
 
 import { useState } from "react";

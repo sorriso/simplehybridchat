@@ -1,5 +1,5 @@
 """
-Path: src/storage/exceptions.py
+Path: backend/src/storage/exceptions.py
 Version: 1
 
 Storage-specific exceptions for file operations

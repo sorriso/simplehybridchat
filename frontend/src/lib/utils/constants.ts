@@ -1,4 +1,4 @@
-/* path: src/lib/utils/constants.ts
+/* path: frontend/src/lib/utils/constants.ts
    version: 2 */
 
 export const API_ENDPOINTS = {

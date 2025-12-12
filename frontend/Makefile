@@ -1,16 +1,20 @@
 # =============================================================================
 # Makefile - Frontend Application
 # =============================================================================
-# path: ./Makefile
-# version: 16
+# path: frontend/./Makefile
+# version: 17
 #
 # Description:
 #   Simple and complete Makefile for Next.js chatbot frontend application.
 #
+# Changes in v17:
+#   - Added automatic cache cleanup in 'make dev' command
+#   - Clears .next, node_modules/.cache, .turbo before starting dev server
+#
 # Usage:
 #   make help              - Show all available commands
 #   make install-app       - Install application (npm dependencies)
-#   make dev               - Start development server
+#   make dev               - Start development server (with cache cleanup)
 #   make build             - Build for production (with lint + format check)
 #   make test              - Run all tests
 #   make lint              - Run linter
@@ -36,7 +40,7 @@ help:
 	@echo "  make install-tests   Install EVERYTHING (app + ALL browsers)"
 	@echo ""
 	@echo "DEVELOPMENT:"
-	@echo "  make dev             Start dev server (hot reload)"
+	@echo "  make dev             Start dev server (hot reload + cache cleanup)"
 	@echo "  make build           Build for production (with lint + format check)"
 	@echo "  make start           Start production server"
 	@echo ""
@@ -61,6 +65,7 @@ help:
 	@echo ""
 	@echo "MAINTENANCE:"
 	@echo "  make clean           Clean build artifacts"
+	@echo "  make clean-cache     Clean Next.js cache only"
 	@echo "  make reset           HARD RESET everything"
 	@echo "  make list-files      List all project files (exclude build dirs)"
 	@echo ""
@@ -96,8 +101,18 @@ install-tests:
 
 .PHONY: dev
 dev:
-	@echo "Starting dev server -> http://localhost:3000"
-	npm run dev
+	@echo "==================================================="
+	@echo "  Starting Development Server"
+	@echo "==================================================="
+	@echo ""
+	@echo "[1/2] Cleaning Next.js cache..."
+	@rm -rf .next 2>/dev/null || true
+	@rm -rf node_modules/.cache 2>/dev/null || true
+	@rm -rf .turbo 2>/dev/null || true
+	@echo "✓ Cache cleaned (.next, node_modules/.cache, .turbo)"
+	@echo ""
+	@echo "[2/2] Starting dev server -> http://localhost:3000"
+	@npm run dev
 
 .PHONY: build
 build:
@@ -223,6 +238,14 @@ clean:
 	rm -rf .next out coverage playwright-report test-results
 	@echo "Clean complete!"
 
+.PHONY: clean-cache
+clean-cache:
+	@echo "Cleaning Next.js cache..."
+	@rm -rf .next 2>/dev/null || true
+	@rm -rf node_modules/.cache 2>/dev/null || true
+	@rm -rf .turbo 2>/dev/null || true
+	@echo "✓ Cache cleaned (.next, node_modules/.cache, .turbo)"
+
 .PHONY: reset
 reset:
 	@echo "==================================================="
@@ -244,7 +267,7 @@ reset:
 .PHONY: list-files
 list-files:
 	@echo "Listing all project files..."
-	@find . -type f ! -path "*/node_modules/*" ! -path "*/.next/*" ! -path "*/coverage/*" ! -path "*/playwright-report/*" ! -path "*/test-results/*" | sort
+	@find . -type f ! -path "*/node_modules/*" ! -path "*/.next/*" ! -path "*/coverage/*" ! -path "*/playwright-report/*" ! -path "*/test-results/*" ! -path "*/venv/*" ! -path "*/__pycache__/*" ! -path "*/.DS_Store" ! -path "*/.git/*" ! -path "*/.gitignore" ! -path "*/.*.log" | sort
 
 # =============================================================================
 # USAGE NOTES
@@ -255,7 +278,7 @@ list-files:
 #   make install-tests    (for dev + tests)
 #
 # DAILY DEV:
-#   make dev              (start coding)
+#   make dev              (start coding - cache auto-cleaned)
 #   make test-unit        (quick tests)
 #
 # BEFORE COMMIT:

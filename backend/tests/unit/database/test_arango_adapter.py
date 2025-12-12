@@ -1,5 +1,5 @@
 """
-Path: tests/unit/database/test_arango_adapter.py
+Path: backend/tests/unit/database/test_arango_adapter.py
 Version: 2
 
 Changes in v2:

@@ -1,6 +1,10 @@
 """
-Path: tests/integration/api/test_auth_middleware_integration.py
-Version: 3
+Path: backend/tests/integration/api/test_auth_middleware_integration.py
+Version: 4
+
+Changes in v4:
+- FIX: Updated generic user ID from "john-doe" to "user-generic"
+- Aligns with Phase 7 middleware v5 changes
 
 Integration tests for authentication middleware with FastAPI
 """
@@ -149,7 +153,7 @@ class TestAuthMiddlewareIntegration:
         assert response.status_code == 200
         data = response.json()
         assert "user" in data
-        assert data["user"]["id"] == "john-doe"
+        assert data["user"]["id"] == "user-generic"
     
     def test_multiple_protected_endpoints(self, client):
         """Test multiple protected endpoints share same token"""

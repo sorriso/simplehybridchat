@@ -1,5 +1,5 @@
 """
-Path: src/models/__init__.py
+Path: backend/src/models/__init__.py
 Version: 1
 
 Models package - API request/response models

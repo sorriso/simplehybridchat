@@ -1,4 +1,4 @@
-/* path: src/components/settings/PromptCustomization.tsx
+/* path: frontend/src/components/settings/PromptCustomization.tsx
    version: 1 */
 
 import { useState, useEffect } from "react";

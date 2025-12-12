@@ -1,5 +1,5 @@
 """
-Path: src/storage/adapters/minio_adapter.py
+Path: backend/src/storage/adapters/minio_adapter.py
 Version: 2
 
 MinIO/S3-compatible storage adapter implementation

@@ -1,5 +1,5 @@
 """
-Path: src/database/adapters/__init__.py
+Path: backend/src/database/adapters/__init__.py
 Version: 1.0
 
 Database adapters package

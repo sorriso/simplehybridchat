@@ -1,4 +1,4 @@
-/* path: src/lib/hooks/useSettings.ts
+/* path: frontend/src/lib/hooks/useSettings.ts
    version: 2 */
 
 import { useState, useEffect, useCallback } from "react";

@@ -1,0 +1,105 @@
+# path: docker-compose.yml
+# version: 4.0
+#
+# Development environment ONLY
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chatbot-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - ARANGO_HOST=arangodb
+      - ARANGO_PORT=8529
+      - ARANGO_DATABASE=chatbot
+      - ARANGO_USER=root
+      - ARANGO_PASSWORD=changeme
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_SECURE=false
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - CORS_ORIGINS=http://localhost:3000
+#    volumes:
+#      - ./backend/src:/app/src:ro
+    depends_on:
+      - arangodb
+      - minio
+    networks:
+      - chatbot
+    restart: unless-stopped
+
+#   frontend:
+#     build:
+#       context: ./frontend
+#       dockerfile: Dockerfile
+#     container_name: chatbot-frontend
+#     ports:
+#       - "3000:80"
+#     environment:
+#       - NODE_ENV=development
+#       - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+# #    volumes:
+# #      - ./frontend/src:/app/src:ro
+# #      - ./frontend/public:/app/public:ro
+#     depends_on:
+#       - backend
+#     networks:
+#       - chatbot
+#     restart: unless-stopped
+
+  arangodb:
+    image: arangodb:latest
+    container_name: chatbot-arangodb
+    environment:
+      - ARANGO_ROOT_PASSWORD=changeme
+    ports:
+      - "8529:8529"
+    volumes:
+      - arangodb-data:/var/lib/arangodb3
+    networks:
+      - chatbot
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: chatbot-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    networks:
+      - chatbot
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: chatbot-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - chatbot
+    restart: unless-stopped
+
+networks:
+  chatbot:
+    driver: bridge
+
+volumes:
+  arangodb-data:
+  minio-data:
+  ollama-data:

@@ -1,4 +1,4 @@
-/* path: src/components/chat/ChatContainer.tsx
+/* path: frontend/src/components/chat/ChatContainer.tsx
    version: 2 - Accept currentConversationId as prop */
 
 "use client";

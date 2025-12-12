@@ -1,11 +1,28 @@
 """
-Path: src/models/responses.py
-Version: 4
+Path: backend/src/models/responses.py
+Version: 8
 
 Standard API response wrappers for consistent format
+
+Changes in v8:
+- Added FileListResponse and SingleFileResponse for files endpoints
+
+Changes in v7:
+- Added MessageListResponse for GET /api/conversations/{id}/messages
+
+Changes in v6:
+- Added ConversationListResponse for GET /api/conversations
+- Added SingleConversationResponse for single conversation endpoints
+
+Changes in v5:
+- Added UserListResponse for GET /api/users (frontend-compatible format)
+- Added SingleUserResponse for single user endpoints (frontend-compatible format)
+- Added StatusUpdateRequest for PUT /api/users/{id}/status
+- Added RoleUpdateRequest for PUT /api/users/{id}/role
 """
 
 from typing import TypeVar, Generic, Optional, List, Dict, Any, Union
+from src.models.base import CamelCaseModel
 from pydantic import BaseModel, Field
 
 
@@ -37,7 +54,7 @@ class SuccessResponse(BaseModel, Generic[T]):
     message: Optional[str] = None
 
 
-class ErrorResponse(BaseModel):
+class ErrorResponse(CamelCaseModel):
     """
     Error response wrapper
     
@@ -135,7 +152,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
         )
 
 
-class EmptyResponse(BaseModel):
+class EmptyResponse(CamelCaseModel):
     """
     Empty success response
     
@@ -152,3 +169,118 @@ class EmptyResponse(BaseModel):
     """
     success: bool = True
     message: Optional[str] = None
+
+
+class UserListResponse(BaseModel, Generic[T]):
+    """
+    User list response (frontend-compatible format)
+    
+    Returns list of users wrapped in 'users' key.
+    
+    Example:
+        return UserListResponse(users=[user1, user2])
+        
+        # Returns:
+        # {
+        #   "users": [...]
+        # }
+    """
+    users: List[T]
+
+
+class SingleUserResponse(BaseModel, Generic[T]):
+    """
+    Single user response (frontend-compatible format)
+    
+    Returns single user wrapped in 'user' key.
+    
+    Example:
+        return SingleUserResponse(user=user_data)
+        
+        # Returns:
+        # {
+        #   "user": {...}
+        # }
+    """
+    user: T
+
+
+class StatusUpdateRequest(BaseModel):
+    """
+    Request to update user status
+    
+    Example:
+        {"status": "disabled"}
+    """
+    status: str = Field(..., pattern="^(active|disabled)$")
+
+
+class RoleUpdateRequest(BaseModel):
+    """
+    Request to update user role
+    
+    Example:
+        {"role": "manager"}
+    """
+    role: str = Field(..., pattern="^(user|manager|root)$")
+
+
+class ConversationListResponse(BaseModel, Generic[T]):
+    """
+    Conversation list response (frontend-compatible format)
+    
+    Returns list of conversations wrapped in 'conversations' key.
+    
+    Example:
+        return ConversationListResponse(conversations=[conv1, conv2])
+        
+        # Returns:
+        # {
+        #   "conversations": [...]
+        # }
+    """
+    conversations: List[T]
+
+
+class SingleConversationResponse(BaseModel, Generic[T]):
+    """
+    Single conversation response (frontend-compatible format)
+    
+    Returns single conversation wrapped in 'conversation' key.
+    
+    Example:
+        return SingleConversationResponse(conversation=conv_data)
+        
+        # Returns:
+        # {
+        #   "conversation": {...}
+        # }
+    """
+    conversation: T
+
+
+class MessageListResponse(BaseModel, Generic[T]):
+    """
+    Message list response (frontend-compatible format)
+    
+    Returns list of messages wrapped in 'messages' key.
+    
+    Example:
+        return MessageListResponse(messages=[msg1, msg2])
+        
+        # Returns:
+        # {
+        #   "messages": [...]
+        # }
+    """
+    messages: List[T]
+
+
+class FileListResponse(BaseModel, Generic[T]):
+    """File list response (frontend-compatible format)"""
+    files: List[T]
+
+
+class SingleFileResponse(BaseModel, Generic[T]):
+    """Single file response (frontend-compatible format)"""
+    file: T

@@ -1,5 +1,5 @@
 """
-Path: src/database/adapters/arango_adapter.py
+Path: backend/src/database/adapters/arango_adapter.py
 Version: 3
 
 ArangoDB implementation of IDatabase interface

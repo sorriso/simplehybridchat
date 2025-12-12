@@ -1,5 +1,5 @@
 """
-Path: tests/integration/api/test_deps_integration.py
+Path: backend/tests/integration/api/test_deps_integration.py
 Version: 2
 
 Changes in v2:

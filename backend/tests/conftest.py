@@ -1,11 +1,35 @@
-# path: tests/conftest.py
-# version: 3 - Enhanced cleanup with better error handling
+# path: backend/tests/conftest.py
+# version: 8 - Removed ollama imports (now in integration/conftest.py)
 
 import os
 import sys
 import pytest
 import signal
+import logging
 from typing import List
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# LLM PROVIDER SETUP - Ollama for integration tests
+# =============================================================================
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_llm_provider():
+    """
+    Configure LLM provider for tests
+    
+    Uses Ollama by default (via ollama_container fixture in integration tests).
+    Can be overridden with OPENROUTER_API_KEY env var for OpenRouter tests.
+    """
+    # Check if OpenRouter token is available
+    if os.getenv("OPENROUTER_API_KEY"):
+        logger.info("OpenRouter API key found - will use OpenRouter for tests")
+    else:
+        logger.info("No OpenRouter API key - will use Ollama for tests")
+    
+    yield
 
 
 # =============================================================================
@@ -21,6 +45,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration: Integration tests")
     config.addinivalue_line("markers", "docker: Tests requiring Docker")
     config.addinivalue_line("markers", "slow: Slow running tests")
+    config.addinivalue_line("markers", "openrouter: Tests requiring OpenRouter API key")
     
     # Display configuration
     print("\n" + "="*80)

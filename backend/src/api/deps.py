@@ -1,5 +1,5 @@
 """
-Path: src/api/deps.py
+Path: backend/src/api/deps.py
 Version: 2
 
 FastAPI dependency injection functions

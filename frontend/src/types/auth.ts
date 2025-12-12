@@ -1,4 +1,4 @@
-/* path: src/types/auth.ts
+/* path: frontend/src/types/auth.ts
    version: 1 */
 
 /**

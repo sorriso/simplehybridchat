@@ -1,4 +1,4 @@
-/* path: ./postcss.config.js
+/* path: frontend/./postcss.config.js
    version: 5 */
 
    module.exports = {

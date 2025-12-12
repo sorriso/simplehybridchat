@@ -1,9 +1,13 @@
 """
-Path: src/services/user_service.py
-Version: 6
+Path: backend/src/services/user_service.py
+Version: 7
 
 User management service
 Handles user CRUD operations with role-based permissions
+
+Changes in v7:
+- Added toggle_user_status() for PUT /api/users/{id}/status
+- Added assign_user_role() for PUT /api/users/{id}/role
 
 Changes in v6:
 - ARCHITECTURE: Removed _map_db_to_response() - adapter now does DB-to-Service mapping  
@@ -353,3 +357,125 @@ class UserService:
             )
         
         return UserResponse(**user)
+    
+    def toggle_user_status(
+        self,
+        user_id: str,
+        new_status: str,
+        current_user: Dict[str, Any]
+    ) -> UserResponse:
+        """
+        Toggle user status (active/disabled)
+        
+        Manager can toggle users in their groups, root can toggle anyone.
+        Cannot disable self.
+        
+        Args:
+            user_id: ID of user to update
+            new_status: New status ("active" or "disabled")
+            current_user: Current authenticated user
+            
+        Returns:
+            Updated user
+            
+        Raises:
+            HTTPException 403: If insufficient permissions or trying to disable self
+            HTTPException 404: If user not found
+        """
+        # Permission check: manager or root
+        if not check_permission(current_user, "manager"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: manager or root permission required"
+            )
+        
+        # Cannot disable self
+        if current_user["id"] == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: cannot disable yourself"
+            )
+        
+        # Get target user
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # TODO: If manager, check if user is in their managed groups
+        # For now, allow all managers to toggle all users
+        
+        # Update status
+        user["status"] = new_status
+        user["updated_at"] = datetime.utcnow()
+        
+        updated_user = self.user_repo.update(user_id, user)
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # TODO: If disabled, revoke all active sessions
+        
+        return UserResponse(**updated_user)
+    
+    def assign_user_role(
+        self,
+        user_id: str,
+        new_role: str,
+        current_user: Dict[str, Any]
+    ) -> UserResponse:
+        """
+        Assign role to user (root only)
+        
+        Args:
+            user_id: ID of user to update
+            new_role: New role ("user", "manager", or "root")
+            current_user: Current authenticated user
+            
+        Returns:
+            Updated user
+            
+        Raises:
+            HTTPException 403: If not root or trying to demote self
+            HTTPException 404: If user not found
+        """
+        # Permission check: root only
+        if not check_permission(current_user, "root"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: only root users can assign roles"
+            )
+        
+        # Cannot demote self from root
+        if current_user["id"] == user_id and new_role != "root":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: cannot demote yourself from root"
+            )
+        
+        # Get target user
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # TODO: If demoting from root, ensure at least one root remains
+        
+        # Update role
+        user["role"] = new_role
+        user["updated_at"] = datetime.utcnow()
+        
+        updated_user = self.user_repo.update(user_id, user)
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        return UserResponse(**updated_user)

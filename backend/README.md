@@ -1,4 +1,6 @@
 # Chatbot Backend API
+# Path: backend/README.md
+# Version: 1
 
 FastAPI backend for chatbot application.
 

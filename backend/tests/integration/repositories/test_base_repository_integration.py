@@ -1,5 +1,5 @@
 """
-Path: tests/integration/repositories/test_base_repository_integration.py
+Path: backend/tests/integration/repositories/test_base_repository_integration.py
 Version: 3
 
 Changes in v3:

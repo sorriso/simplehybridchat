@@ -1,4 +1,4 @@
-/* path: src/components/ui/Modal.tsx
+/* path: frontend/src/components/ui/Modal.tsx
    version: 2 */
 
 import { ReactNode, useEffect, useId } from "react";

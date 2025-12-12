@@ -1,4 +1,4 @@
-# path: ./Caddyfile
+# path: frontend/./Caddyfile
 # version: 1
 
 :80 {

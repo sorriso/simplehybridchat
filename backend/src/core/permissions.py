@@ -1,5 +1,5 @@
 """
-Path: src/core/permissions.py
+Path: backend/src/core/permissions.py
 Version: 2
 
 Permission utilities for role-based access control

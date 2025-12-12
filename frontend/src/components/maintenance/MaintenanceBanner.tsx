@@ -1,4 +1,4 @@
-/* path: src/components/maintenance/MaintenanceBanner.tsx
+/* path: frontend/src/components/maintenance/MaintenanceBanner.tsx
    version: 1 */
 
 import { AlertTriangle, X } from "lucide-react";

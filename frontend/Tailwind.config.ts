@@ -1,4 +1,4 @@
-/* path: ./Tailwind.config.ts
+/* path: frontend/./Tailwind.config.ts
    version: 1 */
 
 import type { Config } from 'tailwindcss'

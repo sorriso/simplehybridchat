@@ -1,4 +1,4 @@
-// path: ./next.config.js
+// path: frontend/./next.config.js
 // version: 1
 
 /** @type {import('next').NextConfig} */

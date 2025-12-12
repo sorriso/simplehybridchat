@@ -1,4 +1,4 @@
-/* path: src/lib/hooks/useFileUpload.ts
+/* path: frontend/src/lib/hooks/useFileUpload.ts
    version: 2 - Fixed type checking for ALLOWED_FILE_TYPES.includes() */
 
 import { useState, useCallback } from "react";

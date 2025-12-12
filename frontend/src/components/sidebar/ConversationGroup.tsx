@@ -1,4 +1,4 @@
-/* path: src/components/sidebar/ConversationGroup.tsx
+/* path: frontend/src/components/sidebar/ConversationGroup.tsx
    version: 2 */
 
 import { useState } from "react";

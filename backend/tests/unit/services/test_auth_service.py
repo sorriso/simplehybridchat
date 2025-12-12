@@ -1,8 +1,16 @@
 """
-Path: tests/unit/services/test_auth_service.py
-Version: 2
+Path: backend/tests/unit/services/test_auth_service.py
+Version: 3.1
 
 Unit tests for AuthService
+
+Changes in v3.1:
+- FIX: auth_service fixture now passes db argument to AuthService(db=mock_db)
+- AuthService.__init__() requires db parameter
+
+Changes in v3:
+- ADDED: TestAuthServiceSSO class with 2 SSO verification tests
+- Tests use camelCase keys (accessToken, tokenType, expiresIn)
 
 Changes in v2:
 - FIX: test_register_duplicate_email expects 409 (Conflict) not 400
@@ -11,7 +19,7 @@ Changes in v2:
 
 Changes in v1.3:
 - FIX: Syntax error line 156 - removed quotes around 'password' parameter
-- Fixed: "password": "value" → password="value"
+- Fixed: "password": "value" â†’ password="value"
 
 Changes in v1.2:
 - FIX: Utilise hash bcrypt valide au lieu de "fake_hash"
@@ -28,7 +36,7 @@ from src.models.auth import RegisterRequest, LoginRequest
 from tests.unit.mocks.mock_database import MockDatabase
 
 
-# Hash bcrypt prÃ©-calculÃ© pour "StrongPass123"
+# Hash bcrypt prÃƒÂ©-calculÃƒÂ© pour "StrongPass123"
 VALID_PASSWORD_HASH = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeblhQ7N3OxvKl1yG"
 
 
@@ -45,8 +53,7 @@ def mock_db():
 @pytest.fixture
 def auth_service(mock_db):
     """Provide AuthService with mocked database"""
-    service = AuthService()
-    service.user_repo.db = mock_db
+    service = AuthService(db=mock_db)
     return service
 
 
@@ -171,3 +178,55 @@ class TestAuthService:
         # Returns 401 with generic message (security: don't reveal account status)
         assert exc_info.value.status_code == 401
         assert "invalid" in str(exc_info.value.detail).lower()
+
+class TestAuthServiceSSO:
+    """Test AuthService.verify_sso_session() method"""
+    
+    def test_verify_sso_session_existing_user(self, auth_service):
+        """Test SSO verification with existing user"""
+        # Register user first via regular registration
+        from src.models.auth import RegisterRequest
+        
+        register_req = RegisterRequest(
+            name="John Doe",
+            email="john@example.com",
+            password="StrongPass123"
+        )
+        auth_service.register(register_req)
+        
+        # Now verify SSO session
+        result = auth_service.verify_sso_session(
+            sso_token="abc123",
+            email="john@example.com",
+            name="John Doe"
+        )
+        
+        # Result is Dict with camelCase keys
+        assert isinstance(result, dict)
+        assert result["accessToken"] == "sso-authenticated"
+        assert result["tokenType"] == "sso"
+        assert result["expiresIn"] == 0
+        
+        # User data is nested dict
+        assert result["user"]["email"] == "john@example.com"
+        assert result["user"]["name"] == "John Doe"
+    
+    def test_verify_sso_session_new_user(self, auth_service):
+        """Test SSO verification creates new user"""
+        result = auth_service.verify_sso_session(
+            sso_token="xyz789",
+            email="jane@example.com",
+            name="Jane Doe"
+        )
+        
+        # Result is Dict with camelCase keys
+        assert isinstance(result, dict)
+        assert result["accessToken"] == "sso-authenticated"
+        assert result["tokenType"] == "sso"
+        assert result["expiresIn"] == 0
+        
+        # New user created
+        assert result["user"]["email"] == "jane@example.com"
+        assert result["user"]["name"] == "Jane Doe"
+        assert result["user"]["role"] == "user"
+        assert result["user"]["status"] == "active"

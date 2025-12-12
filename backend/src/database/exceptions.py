@@ -1,5 +1,5 @@
 """
-Path: src/database/exceptions.py
+Path: backend/src/database/exceptions.py
 Version: 1.0
 
 Database-specific exceptions for error handling

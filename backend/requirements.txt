@@ -1,11 +1,12 @@
 # App dependencies
-# Path: requirements.txt
-# Version: 2
+# Path: backend/requirements.txt
+# Version: 3
 
 fastapi==0.122.0
 uvicorn[standard]==0.38.0
 pydantic==2.12.5
 pydantic-settings==2.12.0
+typing-extensions==4.15.0
 python-arango==8.2.3
 minio==7.2.20
 python-jose[cryptography]==3.5.0

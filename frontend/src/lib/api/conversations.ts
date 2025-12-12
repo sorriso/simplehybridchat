@@ -1,4 +1,4 @@
-/* path: src/lib/api/conversations.ts
+/* path: frontend/src/lib/api/conversations.ts
    version: 1 */
 
 import { apiClient } from "./client";

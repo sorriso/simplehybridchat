@@ -1,5 +1,5 @@
 """
-Path: src/storage/interface.py
+Path: backend/src/storage/interface.py
 Version: 1
 
 Abstract storage interface defining contract for all storage adapters

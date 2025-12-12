@@ -1,5 +1,5 @@
 """
-Path: tests/unit/storage/test_minio_adapter.py
+Path: backend/tests/unit/storage/test_minio_adapter.py
 Version: 1
 
 Unit tests for MinIO storage adapter with mocking

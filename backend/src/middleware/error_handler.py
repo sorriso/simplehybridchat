@@ -1,5 +1,5 @@
 """
-Path: src/middleware/error_handler.py
+Path: backend/src/middleware/error_handler.py
 Version: 2
 
 Global error handling middleware

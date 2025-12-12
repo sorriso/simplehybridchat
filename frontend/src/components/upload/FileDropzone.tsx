@@ -1,4 +1,4 @@
-/* path: src/components/upload/FileDropzone.tsx
+/* path: frontend/src/components/upload/FileDropzone.tsx
    version: 1 */
 
 import { useCallback } from "react";

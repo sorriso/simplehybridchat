@@ -1,4 +1,4 @@
-/* path: src/app/layout.tsx
+/* path: frontend/src/app/layout.tsx
    version: 3 - Added MSWProvider for development mocks */
 
 import type { Metadata } from "next";

@@ -1,6 +1,6 @@
 "use client";
 
-/* path: src/app/page.tsx
+/* path: frontend/src/app/page.tsx
    version: 6 - Fixed conversation selection by removing closure issue */
 
 import { useState } from "react";

@@ -1,8 +1,8 @@
-# path: ./Dockerfile
+# path: frontend/./Dockerfile
 # version: 1
 
 # Stage 1: Build the Next.js application
-FROM node:18-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /app
 

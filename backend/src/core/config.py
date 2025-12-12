@@ -1,6 +1,12 @@
 """
-Path: src/core/config.py
-Version: 3
+Path: backend/src/core/config.py
+Version: 5
+
+Changes in v5:
+- Added LLM_PROVIDER configuration parameter
+- Added comprehensive LLM provider configurations (OpenAI, Claude, Gemini, Databricks, OpenRouter, Ollama)
+- Added LLM_TIMEOUT parameter
+- Restructured LLM configuration section for multi-provider support
 
 Application configuration using pydantic-settings with Kubernetes support
 All settings loaded from environment variables (dev/.env, docker, K8s secrets/configmaps)
@@ -33,6 +39,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
     API_WORKERS: int = 4
     API_RELOAD: bool = False
+    API_PREFIX: str = "/api"  # Global API prefix (e.g., "/api/v1", "/api/v2")
     
     # ========================================================================
     # Environment
@@ -102,10 +109,47 @@ class Settings(BaseSettings):
     # ========================================================================
     # LLM Configuration
     # ========================================================================
+    LLM_PROVIDER: str = "openai"  # openai | claude | gemini | databricks | openrouter | ollama
+    LLM_TIMEOUT: int = 60  # seconds
+    
+    # OpenAI
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4"
+    OPENAI_BASE_URL: Optional[str] = None  # Optional custom endpoint
     OPENAI_MAX_TOKENS: int = 2000
     OPENAI_TEMPERATURE: float = 0.7
+    
+    # Anthropic Claude
+    CLAUDE_API_KEY: Optional[str] = None
+    CLAUDE_MODEL: str = "claude-3-opus-20240229"
+    CLAUDE_MAX_TOKENS: int = 2000
+    CLAUDE_TEMPERATURE: float = 0.7
+    
+    # Google Gemini
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-pro"
+    GEMINI_MAX_TOKENS: int = 2000
+    GEMINI_TEMPERATURE: float = 0.7
+    
+    # Databricks
+    DATABRICKS_API_KEY: Optional[str] = None
+    DATABRICKS_BASE_URL: Optional[str] = None
+    DATABRICKS_MODEL: str = "databricks-dbrx-instruct"
+    DATABRICKS_MAX_TOKENS: int = 2000
+    DATABRICKS_TEMPERATURE: float = 0.7
+    
+    # OpenRouter
+    OPENROUTER_API_KEY: Optional[str] = "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"
+    OPENROUTER_MODEL: str = "openai/gpt-oss-20b:free"
+    OPENROUTER_MAX_TOKENS: int = 2000
+    OPENROUTER_TEMPERATURE: float = 0.7
+    
+    # Ollama (local)
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "tinyllama"  # Changed to tinyllama for faster tests
+    OLLAMA_MAX_TOKENS: int = 2000
+    OLLAMA_TEMPERATURE: float = 0.7
+    OLLAMA_TIMEOUT: int = 300  # 5 minutes for model loading
     
     # ========================================================================
     # File Upload

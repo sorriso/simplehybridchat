@@ -1,4 +1,4 @@
-/* path: src/components/sidebar/NewConversationButton.tsx
+/* path: frontend/src/components/sidebar/NewConversationButton.tsx
    version: 1 */
 
 import { Plus } from "lucide-react";

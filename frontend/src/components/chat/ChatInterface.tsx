@@ -1,4 +1,4 @@
-/* path: src/components/chat/ChatInterface.tsx
+/* path: frontend/src/components/chat/ChatInterface.tsx
    version: 5 - Load conversation history on mount */
 
 "use client";

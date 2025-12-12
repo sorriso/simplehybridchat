@@ -1,4 +1,4 @@
-/* path: src/components/settings/SettingsPanel.tsx
+/* path: frontend/src/components/settings/SettingsPanel.tsx
    version: 4 - Fixed onSave type mismatch by wrapping updatePromptCustomization */
 
 import { X, LogOut, ShieldAlert } from "lucide-react";

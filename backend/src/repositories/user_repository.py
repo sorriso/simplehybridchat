@@ -1,5 +1,5 @@
 """
-Path: src/repositories/user_repository.py
+Path: backend/src/repositories/user_repository.py
 Version: 2
 
 Changes in v2:

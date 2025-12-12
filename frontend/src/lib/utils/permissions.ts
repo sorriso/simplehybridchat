@@ -1,4 +1,4 @@
-/* path: src/lib/utils/permissions.ts
+/* path: frontend/src/lib/utils/permissions.ts
    version: 1 */
 
 import type { User, AuthMode } from "@/types/auth";

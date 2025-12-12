@@ -1,5 +1,5 @@
 """
-Path: src/core/__init__.py
+Path: backend/src/core/__init__.py
 Version: 2
 
 Core functionality package

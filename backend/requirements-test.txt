@@ -1,5 +1,5 @@
 # Testing dependencies
-# Path: requirements-test.txt
+# Path: backend/requirements-test.txt
 # Version: 5
 
 # Core testing
