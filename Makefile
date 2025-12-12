@@ -1,214 +1,78 @@
-# Path: backend/Makefile
-# Version: 12
+# path: Makefile
+# version: 5.0 - Renamed rebuild-backend to rebuild (frontend + backend)
+#
+# Development environment
+# Production: Kubernetes
 
-.PHONY: help install-all install-app install-test clean-all clean-cache test test-unit test-int test-cov dev lint format docker-clean list-files
+.PHONY: help up down logs clean rebuild rebuild-all clean-images
 
-# Python interpreter
-PYTHON := python3
-PIP := $(PYTHON) -m pip
-
-# Virtual environment
-VENV := venv
-VENV_BIN := $(VENV)/bin
-VENV_PYTHON := $(VENV_BIN)/python
-VENV_PIP := $(VENV_BIN)/pip
-
-# Default target
 .DEFAULT_GOAL := help
 
-help:
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "  cyschat Backend - Makefile Commands"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+help: ## Show help
+	@echo "Development Commands:"
+	@echo "  make up              - Start services"
+	@echo "  make down            - Stop services"
+	@echo "  make logs            - Show logs"
+	@echo "  make restart         - Restart services"
+	@echo "  make clean           - Remove containers"
+	@echo "  make rebuild         - Rebuild frontend + backend (delete old images + no cache)"
+	@echo "  make rebuild-all     - Rebuild all services (delete old images + no cache)"
+	@echo "  make clean-images    - Remove all project images"
 	@echo ""
-	@echo "📦 Installation:"
-	@echo "  make install-all      Full reset + install (clean-all + install)"
-	@echo "  make install-app      Install app dependencies only"
-	@echo "  make install-test     Install test dependencies only"
+	@echo "URLs:"
+	@echo "  Frontend:  http://localhost:3000"
+	@echo "  Backend:   http://localhost:8000"
+	@echo "  API Docs:  http://localhost:8000/docs"
+	@echo "  ArangoDB:  http://localhost:8529 (root/changeme)"
+	@echo "  MinIO:     http://localhost:9001 (minioadmin/minioadmin)"
 	@echo ""
-	@echo "🧹 Cleanup:"
-	@echo "  make clean-all        Full cleanup (venv + all caches)"
-	@echo "  make clean-cache      Remove Python caches only"
-	@echo ""
-	@echo "🧪 Testing (all tests run in parallel):"
-	@echo "  make test             Run all tests (auto-cleans cache)"
-	@echo "  make test-unit        Run unit tests only"
-	@echo "  make test-int         Run integration tests (Docker required)"
-	@echo "  make test-cov         Run tests with coverage report"
-	@echo ""
-	@echo "🐳 Docker Management:"
-	@echo "  make docker-clean     Remove stopped testcontainers"
-	@echo ""
-	@echo "🚀 Development:"
-	@echo "  make dev              Run development server"
-	@echo "  make lint             Run linter checks"
-	@echo "  make format           Format code"
-	@echo ""
-	@echo "📋 Utilities:"
-	@echo "  make list-files       List all Python files in project"
-	@echo ""
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# ============================================================================
-# INSTALLATION
-# ============================================================================
+up: ## Start services
+	docker-compose up -d
+	@echo "✅ Services started"
 
-install-all: clean-all
-	@echo "🔄 Full installation: cleaning + installing..."
-	@$(MAKE) install-app
-	@$(MAKE) install-test
-	@echo "✅ Full installation complete"
+down: ## Stop services
+	docker-compose down
 
-install-app:
-	@echo "📦 Installing application dependencies..."
-	@if [ ! -d "$(VENV)" ]; then \
-		echo "🔧 Creating virtual environment..."; \
-		$(PYTHON) -m venv $(VENV); \
-	fi
-	@$(VENV_PYTHON) -m pip install --upgrade pip
-	@$(VENV_PYTHON) -m pip install -r requirements.txt
-	@echo "✅ Application dependencies installed"
+logs: ## Show logs
+	docker-compose logs -f
 
-install-test:
-	@echo "📦 Installing test dependencies..."
-	@if [ ! -d "$(VENV)" ]; then \
-		echo "❌ Virtual environment not found. Run 'make install-app' first."; \
-		exit 1; \
-	fi
-	@$(VENV_PYTHON) -m pip install -r requirements-test.txt
-	@echo "✅ Test dependencies installed"
+restart: ## Restart services
+	docker-compose restart
 
-# ============================================================================
-# CLEANUP
-# ============================================================================
+clean: ## Remove containers and volumes
+	docker-compose down -v
 
-clean-all:
-	@echo "🧹 Full cleanup: removing venv and all caches..."
-	@$(MAKE) -s clean-cache
-	@chmod -R 777 $(VENV) 2>/dev/null || true
-	@rm -rf $(VENV) 2>/dev/null || true
-	@echo "✅ Full cleanup complete (venv removed)"
+rebuild: ## Rebuild frontend + backend (delete old images + no cache)
+	@echo "🛑 Stopping frontend and backend..."
+	@docker-compose stop frontend backend
+	@echo "🗑️  Removing frontend and backend containers..."
+	@docker-compose rm -f frontend backend
+	@echo "🗑️  Removing frontend and backend images..."
+	@docker rmi simplehybridchat-main-backend:latest 2>/dev/null || echo "No backend image found"
+	@docker rmi simplehybridchat-main-frontend:latest 2>/dev/null || echo "No frontend image found"
+	@echo "🔨 Building frontend and backend (no cache)..."
+	@docker-compose build --no-cache backend
+	@docker-compose build --no-cache frontend
+	@echo "🚀 Starting frontend and backend..."
+	@docker-compose up -d frontend backend
+	@echo "✅ Frontend and backend rebuilt successfully"
+	@echo "📋 Checking logs (wait 3 seconds)..."
+	@sleep 3
+	@docker-compose logs --tail=30 backend frontend
 
-clean-cache:
-	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
-	@find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	@find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
-	@find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
-	@rm -rf .coverage htmlcov/ coverage.xml 2>/dev/null || true
+rebuild-all: ## Rebuild all services (delete old images + no cache)
+	@echo "🛑 Stopping all services..."
+	@docker-compose down
+	@echo "🗑️  Removing all project images..."
+	@docker images | grep simplehybridchat | awk '{print $$3}' | xargs -r docker rmi -f
+	@echo "🔨 Building all services (no cache)..."
+	@docker-compose build --no-cache
+	@echo "🚀 Starting all services..."
+	@docker-compose up -d
+	@echo "✅ All services rebuilt successfully"
 
-# ============================================================================
-# TESTING (all tests run in parallel with auto cache cleanup)
-# ============================================================================
-
-test: clean-cache
-	@echo "🧪 Running all tests in parallel..."
-	@$(VENV_PYTHON) -m pytest tests/ -n auto -v --cache-clear
-	@echo "✅ All tests completed"
-
-test-unit: clean-cache
-	@echo "🧪 Running unit tests in parallel..."
-	@$(VENV_PYTHON) -m pytest tests/unit/ -n auto -v -m unit
-	@echo "✅ Unit tests completed"
-
-test-int: clean-cache
-	@echo "🧪 Running integration tests in parallel (Docker required)..."
-	@$(VENV_PYTHON) -m pytest tests/integration/ -n auto -v -m integration
-	@$(MAKE) -s docker-clean
-	@echo "✅ Integration tests completed"
-
-test-cov: clean-cache
-	@echo "🧪 Running tests with coverage..."
-	@$(VENV_PYTHON) -m pytest tests/ -n auto -v \
-		--cov=src/database \
-		--cov=src/storage \
-		--cov=src/api \
-		--cov=src/middleware \
-		--cov=src/models \
-		--cov=src/repositories \
-		--cov=src/services \
-		--cov-report=html \
-		--cov-report=term-missing
-	@echo ""
-	@echo "📊 Coverage report generated: htmlcov/index.html"
-
-# ============================================================================
-# DEVELOPMENT
-# ============================================================================
-
-dev:
-	@echo "🚀 Starting development server..."
-	@$(VENV_PYTHON) -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-
-lint:
-	@echo "🔍 Running linter..."
-	@$(VENV_PYTHON) -m ruff check src/ tests/
-
-lint-fix:
-	@echo "🔧 Fixing linting issues..."
-	@$(VENV_PYTHON) -m ruff check --fix src/ tests/
-
-format:
-	@echo "🎨 Formatting code..."
-	@$(VENV_PYTHON) -m black src/ tests/
-
-format-check:
-	@echo "🔍 Checking code formatting..."
-	@$(VENV_PYTHON) -m black --check src/ tests/
-
-typecheck:
-	@echo "🔍 Running type checker..."
-	@$(VENV_PYTHON) -m mypy src/
-
-# ============================================================================
-# DOCKER
-# ============================================================================
-
-docker-clean:
-	@echo "🧹 Cleaning testcontainers..."
-	@docker ps -aq --filter "label=testcontainer=true" | xargs -r docker stop 2>/dev/null || true
-	@docker ps -aq --filter "label=testcontainer=true" | xargs -r docker rm -f -v 2>/dev/null || true
-	@docker container prune -f
-	@echo "✅ Docker cleanup complete"
-
-docker-ps:
-	@echo "📋 Listing testcontainers..."
-	@docker ps -a --filter "label=testcontainer=true" --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}"
-
-docker-stats:
-	@echo "📊 Resource usage of testcontainers:"
-	@docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}" \
-		$$(docker ps --filter "label=testcontainer=true" -q) 2>/dev/null || echo "No testcontainers running"
-
-# ============================================================================
-# QUALITY
-# ============================================================================
-
-quality: lint format-check typecheck
-	@echo "✅ All quality checks passed"
-
-# ============================================================================
-# UTILITIES
-# ============================================================================
-
-list-files:
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "  📋 Project File Structure"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo ""
-	@echo "🔹 Source Files (src/):"
-	@find src -type f -name "*.py" | sort | sed 's|^src/|  |'
-	@echo ""
-	@echo "🔹 Test Files (tests/):"
-	@find tests -type f -name "*.py" | sort | sed 's|^tests/|  |'
-	@echo ""
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📊 Statistics:"
-	@printf "  Source files:  "
-	@find src -type f -name "*.py" | wc -l
-	@printf "  Test files:    "
-	@find tests -type f -name "*.py" | wc -l
-	@printf "  Total Python:  "
-	@find src tests -type f -name "*.py" | wc -l
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+clean-images: ## Remove all project images
+	@echo "🗑️  Removing all project images..."
+	@docker images | grep simplehybridchat | awk '{print $$3}' | xargs -r docker rmi -f
+	@echo "✅ Images removed"

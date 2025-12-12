@@ -1,17 +1,18 @@
 """
 Path: backend/src/main.py
-Version: 13
+Version: 15
 
-Changes in v13:
-- BOOTSTRAP: Complete automatic database initialization on startup
-- Creates database if not exists
-- Creates all collections with indexes if not exist
-- Creates root user if not exists
-- Very explicit logging for all operations
-- Centralized bootstrap process
+Changes in v15:
+- CRITICAL FIX: Added bootstrap_ollama() function for automatic model pull
+- Ollama model is now automatically downloaded on first startup
+- Idempotent: checks if model exists before pulling
+- Independent of deployment method (Docker, Kubernetes, etc.)
+- Startup event now calls: bootstrap_database() then bootstrap_ollama()
 
-Changes in v12:
-- Added automatic root user creation on startup
+Changes in v14:
+- CRITICAL FIX: Use settings.ROOT_USER_EMAIL/PASSWORD/NAME instead of os.getenv()
+- This ensures .env values are properly read via pydantic Settings
+- Removed hardcoded "root@localhost" default
 
 FastAPI application entry point with automatic database bootstrap
 """
@@ -53,6 +54,92 @@ except ImportError:
     ADMIN_AVAILABLE = False
 
 
+async def bootstrap_ollama():
+    """
+    Bootstrap Ollama by ensuring the configured model is available
+    
+    Steps:
+    1. Connect to Ollama server
+    2. Check if model exists
+    3. Pull model if not found
+    
+    Safe to run multiple times (idempotent).
+    Only pulls model if it doesn't exist.
+    """
+    # Only bootstrap if using Ollama
+    if settings.LLM_PROVIDER != "ollama":
+        logger.info("Skipping Ollama bootstrap (LLM_PROVIDER != ollama)")
+        return
+    
+    try:
+        logger.info("")
+        logger.info("=" * 80)
+        logger.info("OLLAMA MODEL INITIALIZATION")
+        logger.info("=" * 80)
+        logger.info(f"Server: {settings.OLLAMA_BASE_URL}")
+        logger.info(f"Model: {settings.OLLAMA_MODEL}")
+        logger.info("")
+        
+        # Import Ollama adapter
+        from src.llm.adapters.ollama_adapter import OllamaAdapter
+        
+        # Create temporary instance for bootstrap
+        ollama = OllamaAdapter()
+        ollama.connect()
+        
+        logger.info("[1/2] Checking if model exists...")
+        
+        # List available models
+        try:
+            models = await ollama.list_models()
+            model_exists = any(
+                settings.OLLAMA_MODEL in model 
+                for model in models
+            )
+            
+            if model_exists:
+                logger.info(f"âœ“ Model '{settings.OLLAMA_MODEL}' already available")
+                logger.info("Skipping download")
+            else:
+                logger.info(f"âœ— Model '{settings.OLLAMA_MODEL}' not found")
+                logger.info("")
+                logger.info("[2/2] Pulling model (this may take 30-60 seconds)...")
+                logger.info("")
+                
+                # Pull the model
+                await ollama.pull_model(settings.OLLAMA_MODEL)
+                
+                logger.info("")
+                logger.info(f"âœ“ Model '{settings.OLLAMA_MODEL}' successfully pulled")
+                
+        except Exception as e:
+            logger.warning(f"Failed to check/pull Ollama model: {e}")
+            logger.warning("Application will continue, but chat may not work until model is available")
+            logger.warning(f"Manual pull: docker exec <container> ollama pull {settings.OLLAMA_MODEL}")
+        
+        # Close the client
+        if ollama.client:
+            await ollama.client.aclose()
+        
+        logger.info("=" * 80)
+        logger.info("OLLAMA INITIALIZATION COMPLETE")
+        logger.info("=" * 80)
+        logger.info("")
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error("OLLAMA BOOTSTRAP ERROR")
+        logger.error("=" * 80)
+        logger.error(f"Error: {e}")
+        logger.error("")
+        logger.error("Possible causes:")
+        logger.error(f"  1. Ollama is not running ({settings.OLLAMA_BASE_URL})")
+        logger.error("  2. Network connectivity to Ollama server")
+        logger.error("  3. Ollama service not healthy")
+        logger.error("=" * 80)
+        logger.warning("Application will continue, but chat may not work")
+
+
 def bootstrap_database():
     """
     Bootstrap database on application startup
@@ -83,7 +170,7 @@ def bootstrap_database():
             password=settings.ARANGO_PASSWORD
         )
         
-        logger.info(f"      ✓ Connected to ArangoDB _system database")
+        logger.info(f"      Ã¢Å“â€œ Connected to ArangoDB _system database")
         
         # Step 2: Create database if not exists
         logger.info(f"[2/4] Checking database '{settings.ARANGO_DATABASE}'")
@@ -91,14 +178,14 @@ def bootstrap_database():
         db_exists = sys_db.has_database(settings.ARANGO_DATABASE)
         
         if db_exists:
-            logger.info(f"      ✓ Database '{settings.ARANGO_DATABASE}' already exists")
+            logger.info(f"      Ã¢Å“â€œ Database '{settings.ARANGO_DATABASE}' already exists")
         else:
-            logger.info(f"      ⚙ Database '{settings.ARANGO_DATABASE}' does not exist, creating...")
+            logger.info(f"      Ã¢Å¡â„¢ Database '{settings.ARANGO_DATABASE}' does not exist, creating...")
             try:
                 sys_db.create_database(settings.ARANGO_DATABASE)
-                logger.info(f"      ✓ Database '{settings.ARANGO_DATABASE}' created successfully")
+                logger.info(f"      Ã¢Å“â€œ Database '{settings.ARANGO_DATABASE}' created successfully")
             except DatabaseCreateError as e:
-                logger.error(f"      ✗ Failed to create database: {e}")
+                logger.error(f"      Ã¢Å“â€” Failed to create database: {e}")
                 raise
         
         # Connect to application database
@@ -179,11 +266,11 @@ def bootstrap_database():
             
             # Create collection
             if db.has_collection(coll_name):
-                logger.info(f"      ✓ Collection '{coll_name}' already exists")
+                logger.info(f"      Ã¢Å“â€œ Collection '{coll_name}' already exists")
             else:
-                logger.info(f"      ⚙ Creating collection '{coll_name}'...")
+                logger.info(f"      Ã¢Å¡â„¢ Creating collection '{coll_name}'...")
                 db.create_collection(coll_name)
-                logger.info(f"      ✓ Collection '{coll_name}' created")
+                logger.info(f"      Ã¢Å“â€œ Collection '{coll_name}' created")
             
             # Create indexes
             collection = db.collection(coll_name)
@@ -203,20 +290,20 @@ def bootstrap_database():
                             unique=index_config.get("unique", False)
                         )
                     
-                    logger.info(f"      ✓ Index on '{coll_name}' [{fields_str}]{unique_str}")
+                    logger.info(f"      Ã¢Å“â€œ Index on '{coll_name}' [{fields_str}]{unique_str}")
                 except Exception as e:
                     # Index might already exist, log but don't fail
-                    logger.debug(f"      ⚠ Index already exists or error: {e}")
+                    logger.debug(f"      Ã¢Å¡Â  Index already exists or error: {e}")
         
-        logger.info(f"      ✓ All collections and indexes ready")
+        logger.info(f"      Ã¢Å“â€œ All collections and indexes ready")
         
         # Step 4: Create root user if not exists
         logger.info(f"[4/4] Checking root user")
         
-        import os
-        root_email = os.getenv("ROOT_USER_EMAIL", "root@localhost")
-        root_password = os.getenv("ROOT_USER_PASSWORD", "changeme123")
-        root_name = os.getenv("ROOT_USER_NAME", "Root Admin")
+        # FIXED v14: Use settings (reads from .env via pydantic) instead of os.getenv()
+        root_email = settings.ROOT_USER_EMAIL
+        root_password = settings.ROOT_USER_PASSWORD
+        root_name = settings.ROOT_USER_NAME
         
         users_collection = db.collection("users")
         
@@ -225,11 +312,11 @@ def bootstrap_database():
         existing_users = [doc for doc in cursor]
         
         if existing_users:
-            logger.info(f"      ✓ Root user already exists: {root_email}")
+            logger.info(f"      Ã¢Å“â€œ Root user already exists: {root_email}")
             logger.info(f"        User ID: {existing_users[0]['_key']}")
             logger.info(f"        Role: {existing_users[0].get('role', 'unknown')}")
         else:
-            logger.info(f"      ⚙ Root user not found, creating...")
+            logger.info(f"      Ã¢Å¡â„¢ Root user not found, creating...")
             logger.info(f"        Email: {root_email}")
             logger.info(f"        Name: {root_name}")
             
@@ -247,13 +334,13 @@ def bootstrap_database():
             
             result = users_collection.insert(root_user)
             
-            logger.info(f"      ✓ Root user created successfully")
+            logger.info(f"      Ã¢Å“â€œ Root user created successfully")
             logger.info(f"        User ID: {result['_key']}")
             logger.info(f"        Email: {root_email}")
-            logger.warning(f"      ⚠ DEFAULT CREDENTIALS IN USE")
+            logger.warning(f"      Ã¢Å¡Â  DEFAULT CREDENTIALS IN USE")
             logger.warning(f"        Login: {root_email}")
             logger.warning(f"        Password: {root_password}")
-            logger.warning(f"      ⚠ CHANGE PASSWORD AFTER FIRST LOGIN!")
+            logger.warning(f"      Ã¢Å¡Â  CHANGE PASSWORD AFTER FIRST LOGIN!")
         
         logger.info("=" * 80)
         logger.info("DATABASE BOOTSTRAP - COMPLETE")
@@ -307,15 +394,15 @@ app.include_router(user_settings.router, prefix=settings.API_PREFIX, tags=["Sett
 # Include optional routers (Phase 2, 3, 4)
 if GROUPS_AVAILABLE:
     app.include_router(groups.router, prefix=settings.API_PREFIX, tags=["Groups"])
-    logger.info("✓ Groups routes loaded")
+    logger.info("Ã¢Å“â€œ Groups routes loaded")
 
 if USER_GROUPS_AVAILABLE:
     app.include_router(user_groups.router, prefix=settings.API_PREFIX, tags=["User Groups"])
-    logger.info("✓ User Groups routes loaded")
+    logger.info("Ã¢Å“â€œ User Groups routes loaded")
 
 if ADMIN_AVAILABLE:
     app.include_router(admin.router, prefix=settings.API_PREFIX, tags=["Admin"])
-    logger.info("✓ Admin routes loaded")
+    logger.info("Ã¢Å“â€œ Admin routes loaded")
 
 
 @app.on_event("startup")
@@ -347,6 +434,9 @@ async def startup_event():
     
     # Run database bootstrap
     bootstrap_database()
+    
+    # Run Ollama bootstrap (if using Ollama)
+    await bootstrap_ollama()
     
     logger.info("")
     logger.info("=" * 80)

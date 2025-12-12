@@ -1,6 +1,10 @@
 """
 Path: backend/src/repositories/settings_repository.py
-Version: 1
+Version: 2
+
+Changes in v2:
+- CRITICAL FIX: Changed collection name from "user_settings" to "settings"
+- This matches the collection created in main.py bootstrap
 
 Repository for user settings persistence in ArangoDB
 """
@@ -33,7 +37,7 @@ class SettingsRepository(BaseRepository):
         from src.database.factory import get_database
         if db is None:
             db = get_database()
-        super().__init__(db=db, collection="user_settings")
+        super().__init__(db=db, collection="settings")  # FIXED v2: was "user_settings"
     
     def get_by_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         """

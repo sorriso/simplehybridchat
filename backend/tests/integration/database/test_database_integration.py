@@ -3,11 +3,11 @@ Path: backend/tests/integration/database/test_database_integration.py
 Version: 3
 
 Changes in v3:
-- Fixed pagination test: u["_key"] → u["id"] (lines 184-185)
+- Fixed pagination test: u["_key"] â†’ u["id"] (lines 184-185)
 
 Changes in v2:
-- Modified all assertions: assert "_key" in → assert "id" in
-- Modified all document accesses: doc["_key"] → doc["id"]
+- Modified all assertions: assert "_key" in â†’ assert "id" in
+- Modified all document accesses: doc["_key"] â†’ doc["id"]
 - Tests now verify database returns 'id' (adapter behavior)
 
 Database integration tests with real ArangoDB
@@ -327,7 +327,7 @@ class TestDatabaseIntegrationModuleScope:
 
 
 # ============================================================================
-# PATTERN TESTS - Bottom-up (DB â†’ API) and Top-down (API â†’ DB)
+# PATTERN TESTS - Bottom-up (DB Ã¢â€ â€™ API) and Top-down (API Ã¢â€ â€™ DB)
 # ============================================================================
 
 class TestDatabasePatterns:

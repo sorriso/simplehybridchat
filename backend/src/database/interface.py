@@ -3,7 +3,7 @@ Path: backend/src/database/interface.py
 Version: 2
 
 Changes in v2:
-- Fixed docstring example: doc["_key"] → doc["id"]
+- Fixed docstring example: doc["_key"] â†’ doc["id"]
 - Documentation now reflects actual adapter behavior
 
 Abstract database interface defining contract for all database adapters

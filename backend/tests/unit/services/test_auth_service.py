@@ -19,7 +19,7 @@ Changes in v2:
 
 Changes in v1.3:
 - FIX: Syntax error line 156 - removed quotes around 'password' parameter
-- Fixed: "password": "value" â†’ password="value"
+- Fixed: "password": "value" Ã¢â€ â€™ password="value"
 
 Changes in v1.2:
 - FIX: Utilise hash bcrypt valide au lieu de "fake_hash"
@@ -36,7 +36,7 @@ from src.models.auth import RegisterRequest, LoginRequest
 from tests.unit.mocks.mock_database import MockDatabase
 
 
-# Hash bcrypt prÃƒÂ©-calculÃƒÂ© pour "StrongPass123"
+# Hash bcrypt prÃƒÆ’Ã‚Â©-calculÃƒÆ’Ã‚Â© pour "StrongPass123"
 VALID_PASSWORD_HASH = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeblhQ7N3OxvKl1yG"
 
 

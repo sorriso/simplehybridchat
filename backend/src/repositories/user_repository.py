@@ -3,7 +3,7 @@ Path: backend/src/repositories/user_repository.py
 Version: 2
 
 Changes in v2:
-- Modified user["_key"] → user["id"]
+- Modified user["_key"] â†’ user["id"]
 - Repository now uses 'id' from adapter consistently
 
 User repository for data access

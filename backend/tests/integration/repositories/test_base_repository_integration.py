@@ -3,12 +3,12 @@ Path: backend/tests/integration/repositories/test_base_repository_integration.py
 Version: 3
 
 Changes in v3:
-- Fixed item["_key"] → item["id"] (line 268)
-- Fixed bulk_create assertion: "_key" → "id" (line 174)
+- Fixed item["_key"] â†’ item["id"] (line 268)
+- Fixed bulk_create assertion: "_key" â†’ "id" (line 174)
 
 Changes in v2:
-- Modified all document accesses: doc["_key"] → doc["id"]
-- Modified all assertions: "_key" → "id"
+- Modified all document accesses: doc["_key"] â†’ doc["id"]
+- Modified all assertions: "_key" â†’ "id"
 - Tests now verify integration with real adapter
 
 Integration tests for BaseRepository with real ArangoDB

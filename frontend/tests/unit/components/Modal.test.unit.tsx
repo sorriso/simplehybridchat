@@ -1,5 +1,5 @@
-// path: tests/unit/components/Modal.test.unit.tsx
-// version: 3
+// path: frontend/tests/unit/components/Modal.test.unit.tsx
+// version: 4 - FIXED: Overlay uses data-overlay attribute and inline style
 
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -89,6 +89,7 @@ describe('Modal Component', () => {
         </Modal>
       )
       
+      // FIXED: Real code uses data-overlay="true" attribute
       const overlay = container.querySelector('[data-overlay="true"]')
       if (overlay) {
         await user.click(overlay)
@@ -193,16 +194,16 @@ describe('Modal Component', () => {
       expect(overlay).toBeInTheDocument()
     })
 
-    it('should have semi-transparent background', () => {
+    it('should have semi-transparent background via inline style', () => {
       const { container } = render(
         <Modal isOpen={true} onClose={onClose} title="Test">
           Content
         </Modal>
       )
       
+      // FIXED: Real code uses inline style
       const overlay = container.querySelector('[data-overlay="true"]')
-      expect(overlay?.className).toContain('bg-black')
-      expect(overlay?.className).toContain('bg-opacity')
+      expect(overlay).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.5)' })
     })
   })
 })

@@ -1,5 +1,11 @@
 /* path: frontend/src/lib/api/auth.ts
-   version: 1 */
+   version: 2
+   
+   Changes in v2:
+   - FIXED: login() now accepts 'email' parameter instead of 'username'
+   - FIXED: Request body sends { email, password } to match backend v4.0
+   - Reason: Backend expects email (RFC-compliant), not username
+*/
 
 import { apiClient } from "./client";
 import type {
@@ -56,11 +62,12 @@ export const authApi = {
   },
 
   /**
-   * Login with username/password (for "local" auth mode)
+   * Login with email/password (for "local" auth mode)
+   * Backend v4.0 expects email (RFC-compliant format)
    */
-  login: async (username: string, password: string): Promise<LoginResponse> => {
+  login: async (email: string, password: string): Promise<LoginResponse> => {
     const response = await apiClient.post<LoginResponse>("/api/auth/login", {
-      username,
+      email,
       password,
     } as LoginRequest);
     return response;

@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# SESSION SCOPE - Partagé par TOUS les tests
+# SESSION SCOPE - PartagÃ© par TOUS les tests
 # =============================================================================
 
 @pytest.fixture(scope="session")
@@ -36,7 +36,7 @@ def arango_container_session():
     FASTEST option but requires cleanup between tests.
     Use with clean_database_session fixture.
     
-    ⚡ Speed: ~2s startup for entire session
+    âš¡ Speed: ~2s startup for entire session
     """
     logger.info("Starting ArangoDB container (session scope)...")
     
@@ -67,7 +67,7 @@ def minio_container_session():
     FASTEST option but requires cleanup between tests.
     Use with clean_storage_session fixture.
     
-    ⚡ Speed: ~3s startup for entire session
+    âš¡ Speed: ~3s startup for entire session
     """
     logger.info("Starting MinIO container (session scope)...")
     
@@ -101,7 +101,7 @@ def clean_database_session(arango_container_session):
     
     Use when you need clean state but want session-level container.
     
-    ⚡ Speed: Very fast, just drops collections
+    âš¡ Speed: Very fast, just drops collections
     """
     adapter = arango_container_session
     _cleanup_database(adapter)
@@ -115,7 +115,7 @@ def clean_storage_session(minio_container_session):
     
     Use when you need clean state but want session-level container.
     
-    ⚡ Speed: Very fast, just deletes buckets
+    âš¡ Speed: Very fast, just deletes buckets
     """
     adapter = minio_container_session
     _cleanup_storage(adapter)
@@ -141,7 +141,7 @@ Session scope (shared entire session):
   - Setup time: ~2-3s total
   - 10 tests in 3 files = ~3s
   
-⚡ Session scope is ~8x faster than function scope!
+âš¡ Session scope is ~8x faster than function scope!
 
 USAGE:
 ------
@@ -158,18 +158,18 @@ def test_readonly(arango_container_session):
 WHEN TO USE EACH SCOPE:
 -----------------------
 Session scope:
-  ✓ Read-only tests
-  ✓ Tests with cleanup
-  ✓ Maximum speed
-  ✗ Complex state dependencies
+  âœ“ Read-only tests
+  âœ“ Tests with cleanup
+  âœ“ Maximum speed
+  âœ— Complex state dependencies
 
 Module scope:
-  ✓ Good isolation
-  ✓ Good speed
-  ✓ Balance speed/isolation
+  âœ“ Good isolation
+  âœ“ Good speed
+  âœ“ Balance speed/isolation
 
 Function scope:
-  ✓ Complete isolation
-  ✓ Complex scenarios
-  ✗ Slower
+  âœ“ Complete isolation
+  âœ“ Complex scenarios
+  âœ— Slower
 """

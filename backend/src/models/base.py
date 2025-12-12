@@ -91,8 +91,8 @@ class BaseRequestModel(BaseModel):
             group_ids: List[str]
         
         # Frontend can send:
-        {"groupIds": ["group-1"]}  # ✅ Accepted (via alias)
-        {"group_ids": ["group-1"]}  # ✅ Also accepted (via populate_by_name)
+        {"groupIds": ["group-1"]}  # âœ… Accepted (via alias)
+        {"group_ids": ["group-1"]}  # âœ… Also accepted (via populate_by_name)
         
         # Backend receives:
         request.group_ids  # Always snake_case internally

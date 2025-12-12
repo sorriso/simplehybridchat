@@ -1,10 +1,15 @@
 """
 Path: backend/tests/integration/api/test_files_routes_integration.py
-Version: 2.0
+Version: 3
+
+Changes in v3:
+- FIX: Added minio_container_function parameter to 3 tests
+  - test_upload_invalid_type, test_upload_file_too_large, test_list_files_empty
+- Reason: FileService requires storage connection even for validation
 
 Changes in v2.0:
 - FRONTEND COMPATIBILITY: Updated auth_headers fixtures to use new login format
-- Changed response.json()["data"]["accessToken"] → response.json()["token"]
+- Changed response.json()["data"]["accessToken"] â†’ response.json()["token"]
 
 Integration tests for files API with MinIO
 """
@@ -144,7 +149,7 @@ class TestFileUpload:
         assert data["name"] == "image.png"
         assert data["type"] == "image/png"
     
-    def test_upload_invalid_type(self, client, auth_headers):
+    def test_upload_invalid_type(self, client, auth_headers, minio_container_function):
         """Test upload with invalid file type"""
         file_content = b"malicious executable"
         file = ("malware.exe", BytesIO(file_content), "application/octet-stream")
@@ -158,7 +163,7 @@ class TestFileUpload:
         assert response.status_code == 400
         assert "Invalid file type" in response.json()["detail"]
     
-    def test_upload_file_too_large(self, client, auth_headers):
+    def test_upload_file_too_large(self, client, auth_headers, minio_container_function):
         """Test upload with file too large"""
         # Create 11MB file
         file_content = b"x" * (11 * 1024 * 1024)
@@ -189,7 +194,7 @@ class TestFileUpload:
 class TestFileList:
     """Test file listing endpoint"""
     
-    def test_list_files_empty(self, client, auth_headers):
+    def test_list_files_empty(self, client, auth_headers, minio_container_function):
         """Test list files when user has no files"""
         response = client.get("/api/files", headers=auth_headers)
         
@@ -293,7 +298,7 @@ class TestFileEndToEnd:
     """Test complete file lifecycle"""
     
     def test_upload_list_delete_flow(self, client, auth_headers, minio_container_function):
-        """Test complete workflow: upload â†’ list â†’ delete"""
+        """Test complete workflow: upload Ã¢â€ â€™ list Ã¢â€ â€™ delete"""
         # 1. Upload file
         file = ("lifecycle.txt", BytesIO(b"test lifecycle"), "text/plain")
         upload_resp = client.post(

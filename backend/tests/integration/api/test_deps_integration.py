@@ -3,8 +3,8 @@ Path: backend/tests/integration/api/test_deps_integration.py
 Version: 2
 
 Changes in v2:
-- Modified all user accesses: user["_key"] → user["id"]
-- Modified all assertions: "_key" → "id"
+- Modified all user accesses: user["_key"] â†’ user["id"]
+- Modified all assertions: "_key" â†’ "id"
 - Tests now verify dependency injection with correct format
 
 Integration tests for API dependencies with real database

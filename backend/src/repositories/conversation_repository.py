@@ -1,10 +1,15 @@
 """
 Path: backend/src/repositories/conversation_repository.py
-Version: 2
+Version: 3
+
+Changes in v3:
+- ADDED: update() method to properly update conversation fields
+- Fixes message_count not updating after chat messages
+- Uses db.update() to persist changes to database
 
 Changes in v2:
-- Fixed __init__: collection_name → collection
-- Fixed all methods: self.collection_name → self.collection
+- Fixed __init__: collection_name Ã¢â€ â€™ collection
+- Fixed all methods: self.collection_name Ã¢â€ â€™ self.collection
 - Added factory pattern for db initialization
 
 Repository for managing conversations
@@ -34,6 +39,31 @@ class ConversationRepository(BaseRepository):
         if db is None:
             db = get_database()
         super().__init__(db=db, collection="conversations")
+    
+    def update(self, conversation_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Update conversation fields
+        
+        Args:
+            conversation_id: Conversation ID
+            updates: Dictionary of fields to update
+            
+        Returns:
+            Updated conversation or None if not found
+        """
+        # Get existing conversation
+        conversation = self.get_by_id(conversation_id)
+        if not conversation:
+            return None
+        
+        # Update fields
+        for key, value in updates.items():
+            conversation[key] = value
+        
+        # Save back to database
+        self.db.update(self.collection, conversation_id, conversation)
+        
+        return conversation
     
     def get_by_owner(self, owner_id: str) -> List[Dict[str, Any]]:
         """

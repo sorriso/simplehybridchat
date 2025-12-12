@@ -1,5 +1,10 @@
 /* path: frontend/src/types/auth.ts
-   version: 1 */
+   version: 2
+   
+   Changes in v2:
+   - FIXED: LoginRequest now uses 'email' instead of 'username'
+   - Reason: Backend expects email field, not username (v4.0 backend)
+*/
 
 /**
  * User role levels
@@ -74,9 +79,10 @@ export interface UserSession {
 
 /**
  * Login request (for local auth mode)
+ * Backend expects email (RFC-compliant format) and password
  */
 export interface LoginRequest {
-  username: string;
+  email: string;
   password: string;
 }
 

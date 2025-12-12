@@ -164,7 +164,7 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     logger.info("Ollama container started and ready")
     logger.info(f"Host URL: {host_url}")
     logger.info(f"Internal URL: {internal_url}")
-    print(f"\n🔗 Ollama URLs:", flush=True)
+    print(f"\nðŸ”— Ollama URLs:", flush=True)
     print(f"   From host:       {host_url}", flush=True)
     print(f"   From containers: {internal_url}\n", flush=True)
     
@@ -194,16 +194,16 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
         )
         
         if result.returncode == 0 and "tinyllama" in result.stdout:
-            logger.info("✓ Ollama connection test PASSED")
-            print(f"✓ Ollama connection test PASSED - {internal_url}\n", flush=True)
+            logger.info("âœ“ Ollama connection test PASSED")
+            print(f"âœ“ Ollama connection test PASSED - {internal_url}\n", flush=True)
         else:
-            logger.warning(f"⚠ Ollama connection test FAILED: {result.stderr}")
-            print(f"⚠ Ollama might not be accessible at {internal_url}\n", flush=True)
+            logger.warning(f"âš  Ollama connection test FAILED: {result.stderr}")
+            print(f"âš  Ollama might not be accessible at {internal_url}\n", flush=True)
             print(f"   Error: {result.stderr}\n", flush=True)
     
     except Exception as e:
-        logger.warning(f"⚠ Could not test Ollama connection: {e}")
-        print(f"⚠ Connection test error: {e}\n", flush=True)
+        logger.warning(f"âš  Could not test Ollama connection: {e}")
+        print(f"âš  Connection test error: {e}\n", flush=True)
     
     # =============================================================================
     # MANUAL TESTING PAUSE - Comment out after testing
@@ -222,7 +222,7 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     mapped_port = container.get_exposed_port(container.port)
     
     print("\n" + "="*80, flush=True)
-    print("🎯 OLLAMA READY FOR MANUAL TESTING", flush=True)
+    print("ðŸŽ¯ OLLAMA READY FOR MANUAL TESTING", flush=True)
     print("="*80, flush=True)
     print(f"Container ID:     {container_id}", flush=True)
     print(f"Container IP:     {container_ip} (internal Docker network)", flush=True)
@@ -232,7 +232,7 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     print(f"  {host_url}", flush=True)
     print("", flush=True)
     print(f"URL for app (container-to-container):", flush=True)
-    print(f"  {internal_url} ← USED BY TESTS", flush=True)
+    print(f"  {internal_url} â† USED BY TESTS", flush=True)
     print("", flush=True)
     print(f"Model: tinyllama", flush=True)
     print("", flush=True)
@@ -243,14 +243,14 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     print(f"Interactive mode:", flush=True)
     print(f"  docker exec -it {container_id} ollama run tinyllama", flush=True)
     print("", flush=True)
-    print("⏸️  PAUSING FOR 10 MINUTES (600s)...", flush=True)
+    print("â¸ï¸  PAUSING FOR 10 MINUTES (600s)...", flush=True)
     print("   Press Ctrl+C to skip and continue with tests", flush=True)
     print("="*80 + "\n", flush=True)
     
-    #time.sleep(600)  # ⚠️ COMMENT THIS LINE AFTER MANUAL TESTING
+    #time.sleep(600)  # âš ï¸ COMMENT THIS LINE AFTER MANUAL TESTING
     
     print("\n" + "="*80, flush=True)
-    print("▶️  CONTINUING WITH TESTS...", flush=True)
+    print("â–¶ï¸  CONTINUING WITH TESTS...", flush=True)
     print("="*80 + "\n", flush=True)
     # =============================================================================
     

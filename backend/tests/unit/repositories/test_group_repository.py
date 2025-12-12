@@ -3,7 +3,7 @@ Path: backend/tests/unit/repositories/test_group_repository.py
 Version: 3
 
 Changes in v3:
-- Fixed exception import: DocumentNotFoundError → NotFoundError (correct exception in src.database.exceptions)
+- Fixed exception import: DocumentNotFoundError â†’ NotFoundError (correct exception in src.database.exceptions)
 
 Changes in v2:
 - Changed from MagicMock to MockDatabase (matches ConversationRepository test pattern)

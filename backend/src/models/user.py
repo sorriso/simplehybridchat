@@ -96,12 +96,12 @@ class UserResponse(CamelCaseModel):
     - Maintains backward compatibility with name and status
     
     Inherits from CamelCaseModel for automatic camelCase serialization:
-    - created_at → createdAt
-    - updated_at → updatedAt
-    - last_login → lastLogin
-    - first_name → firstName
-    - last_name → lastName
-    - is_active → isActive
+    - created_at â†’ createdAt
+    - updated_at â†’ updatedAt
+    - last_login â†’ lastLogin
+    - first_name â†’ firstName
+    - last_name â†’ lastName
+    - is_active â†’ isActive
     """
     id: str
     name: str
@@ -123,8 +123,8 @@ class UserResponse(CamelCaseModel):
         Computed field: isActive from status
         
         Maps:
-        - status == "active" → isActive = true
-        - status == "disabled" → isActive = false
+        - status == "active" â†’ isActive = true
+        - status == "disabled" â†’ isActive = false
         """
         return self.status == "active"
     
@@ -135,8 +135,8 @@ class UserResponse(CamelCaseModel):
         Rules:
         - If firstName/lastName already in DB: use them
         - Otherwise: split 'name' on first space
-          - "John Doe" → firstName="John", lastName="Doe"
-          - "John" → firstName="John", lastName=None
+          - "John Doe" â†’ firstName="John", lastName="Doe"
+          - "John" â†’ firstName="John", lastName=None
         """
         if not self.first_name and not self.last_name and self.name:
             parts = self.name.split(' ', 1)

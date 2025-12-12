@@ -9,11 +9,11 @@ Changes in v6:
 - DELETE still returns {"success": true, "message": "..."}
 
 Changes in v5:
-- Fixed 9 remaining _key references â†’ id (lines 234, 261, 286, 311, 337, 363, 391, 415, 442)
+- Fixed 9 remaining _key references Ã¢â€ â€™ id (lines 234, 261, 286, 311, 337, 363, 391, 415, 442)
 - All user/manager/root_user accesses now use ['id']
 
 Changes in v4:
-- Fixed cleanup: existing_root["_key"] â†’ existing_root["id"]
+- Fixed cleanup: existing_root["_key"] Ã¢â€ â€™ existing_root["id"]
 - Matches adapter behavior (returns 'id')
 
 Changes in v3:

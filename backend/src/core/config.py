@@ -1,12 +1,23 @@
 """
 Path: backend/src/core/config.py
-Version: 5
+Version: 7
+
+Changes in v7:
+- CRITICAL FIX: Made .env file loading optional (env_file_required=False)
+- Docker containers get variables via docker-compose env_file
+- Local development still uses .env/.env.local files
+- No error if .env missing in Docker environment
+
+Changes in v6:
+- CRITICAL FIX: Added ROOT_USER_EMAIL, ROOT_USER_PASSWORD, ROOT_USER_NAME
+- CRITICAL FIX: Changed MINIO_DEFAULT_BUCKET default from "uploads" to "chatbot-files"
+- CRITICAL FIX: Support both .env and .env.local files (fallback chain)
+- Better env file resolution for development and production
 
 Changes in v5:
 - Added LLM_PROVIDER configuration parameter
-- Added comprehensive LLM provider configurations (OpenAI, Claude, Gemini, Databricks, OpenRouter, Ollama)
+- Added comprehensive LLM provider configurations
 - Added LLM_TIMEOUT parameter
-- Restructured LLM configuration section for multi-provider support
 
 Application configuration using pydantic-settings with Kubernetes support
 All settings loaded from environment variables (dev/.env, docker, K8s secrets/configmaps)
@@ -25,11 +36,15 @@ class Settings(BaseSettings):
     Application settings
     
     Compatible with:
-    - Local development (.env.local file)
+    - Local development (.env or .env.local file)
     - Docker containers (environment variables)
     - Kubernetes (secrets + configmaps via envFrom)
     
-    All values can be overridden via environment variables.
+    Priority order:
+    1. Environment variables (highest priority)
+    2. .env.local (if exists)
+    3. .env (fallback)
+    4. Defaults in this file (lowest priority)
     """
     
     # ========================================================================
@@ -86,7 +101,7 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin"
     MINIO_SECURE: bool = False
-    MINIO_DEFAULT_BUCKET: str = "uploads"
+    MINIO_DEFAULT_BUCKET: str = "chatbot-files"  # FIXED: Changed from "uploads" to "chatbot-files"
     
     # ========================================================================
     # Authentication
@@ -105,6 +120,14 @@ class Settings(BaseSettings):
     
     # Multi-login
     ALLOW_MULTI_LOGIN: bool = True
+    
+    # ========================================================================
+    # Initial Root User (Bootstrap)
+    # ========================================================================
+    # NEW v6: Added root user configuration for database bootstrap
+    ROOT_USER_EMAIL: str = "root@localhost.com"
+    ROOT_USER_PASSWORD: str = "changeme123"
+    ROOT_USER_NAME: str = "Root Admin"
     
     # ========================================================================
     # LLM Configuration
@@ -146,7 +169,7 @@ class Settings(BaseSettings):
     
     # Ollama (local)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "tinyllama"  # Changed to tinyllama for faster tests
+    OLLAMA_MODEL: str = "tinyllama"
     OLLAMA_MAX_TOKENS: int = 2000
     OLLAMA_TEMPERATURE: float = 0.7
     OLLAMA_TIMEOUT: int = 300  # 5 minutes for model loading
@@ -188,8 +211,12 @@ class Settings(BaseSettings):
     # Pydantic Settings Configuration
     # ========================================================================
     model_config = SettingsConfigDict(
-        env_file=".env.local",
+        # Try multiple env files in order (priority: .env.local > .env)
+        # Files are optional - no error if missing (Docker gets vars from compose)
+        env_file=(".env.local", ".env"),
         env_file_encoding="utf-8",
+        env_ignore_empty=True,      # Ignore empty values in .env files
+        env_file_required=False,    # CRITICAL: Don't fail if .env missing (Docker)
         case_sensitive=True,
         extra="ignore"
     )
@@ -235,10 +262,16 @@ class Settings(BaseSettings):
             # JWT secret
             if self.JWT_SECRET == "change-in-production-use-strong-secret-key":
                 errors.append("JWT_SECRET must be changed in production")
+            
+            # Root user password
+            if self.ROOT_USER_PASSWORD == "changeme123":
+                errors.append("ROOT_USER_PASSWORD must be changed in production")
         else:
             # Development warnings
             if self.JWT_SECRET == "change-in-production-use-strong-secret-key":
                 logger.warning("Using default JWT_SECRET (OK for dev)")
+            if self.ROOT_USER_PASSWORD == "changeme123":
+                logger.warning("Using default ROOT_USER_PASSWORD (OK for dev)")
         
         # Port validation
         if not (1024 <= self.API_PORT <= 65535):
@@ -247,6 +280,10 @@ class Settings(BaseSettings):
             errors.append(f"Invalid ARANGO_PORT: {self.ARANGO_PORT}")
         if not (1024 <= self.MINIO_PORT <= 65535):
             errors.append(f"Invalid MINIO_PORT: {self.MINIO_PORT}")
+        
+        # Root user email validation
+        if not self.ROOT_USER_EMAIL or "@" not in self.ROOT_USER_EMAIL:
+            errors.append(f"Invalid ROOT_USER_EMAIL: {self.ROOT_USER_EMAIL}")
         
         if errors:
             raise ValueError(
@@ -277,7 +314,10 @@ class Settings(BaseSettings):
         logger.info(f"Server: {self.API_HOST}:{self.API_PORT} (workers={self.API_WORKERS})")
         logger.info(f"Database: {self.DB_TYPE} @ {self.ARANGO_HOST}:{self.ARANGO_PORT}/{self.ARANGO_DATABASE}")
         logger.info(f"Storage: {self.STORAGE_TYPE} @ {self.MINIO_HOST}:{self.MINIO_PORT}")
+        logger.info(f"Storage Bucket: {self.MINIO_DEFAULT_BUCKET}")
         logger.info(f"Auth Mode: {self.AUTH_MODE}")
+        logger.info(f"Root User: {self.ROOT_USER_EMAIL}")
+        logger.info(f"LLM Provider: {self.LLM_PROVIDER}")
         logger.info(f"CORS Origins: {self.CORS_ORIGINS}")
         logger.info(f"Maintenance Mode: {self.MAINTENANCE_MODE}")
         logger.info("=" * 80)

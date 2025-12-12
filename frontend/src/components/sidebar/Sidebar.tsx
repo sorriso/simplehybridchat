@@ -1,5 +1,17 @@
 /* path: frontend/src/components/sidebar/Sidebar.tsx
-   version: 4 - Fixed null groupId handling for ungrouping */
+   version: 7
+   
+   Changes in v7:
+   - ADDED: onConversationShare prop to SidebarProps
+   - ADDED: Pass onConversationShare to ConversationList
+   - Reason: Support conversation sharing with user groups
+   
+   Changes in v6:
+   - FIXED: updateConversation signature now accepts groupId?: string | null
+   - FIXED: Simplified groupId assignment (removed redundant ternary)
+   - FIXED: Rename group modal now calls submitGroupRename (was calling submitConversationRename)
+   - Reason: TypeScript build error - null not assignable to string | undefined
+*/
 
 import { useState } from "react";
 import { Settings, FolderPlus, Upload } from "lucide-react";
@@ -25,8 +37,9 @@ interface SidebarProps {
   deleteConversation: (id: string) => Promise<void>;
   updateConversation: (
     id: string,
-    data: { title?: string; groupId?: string },
+    data: { title?: string; groupId?: string | null },
   ) => Promise<Conversation>;
+  onConversationShare: (id: string) => void;
   createGroup: (name: string) => Promise<ConversationGroup>;
   deleteGroup: (id: string) => Promise<void>;
   setCurrentConversationId: (id: string | null) => void;
@@ -46,6 +59,7 @@ export function Sidebar({
   createConversation,
   deleteConversation,
   updateConversation,
+  onConversationShare,
   createGroup,
   deleteGroup,
   setCurrentConversationId,
@@ -150,23 +164,30 @@ export function Sidebar({
     }
   };
 
+  // Submit group rename
+  const submitGroupRename = async () => {
+    if (!selectedItemId || !groupName.trim()) return;
+
+    try {
+      // Note: Group rename API not yet implemented in backend
+      // This would need a new endpoint: PATCH /api/groups/:id
+      console.warn("Group rename API not yet implemented");
+      setShowRenameGroupModal(false);
+      setGroupName("");
+      setSelectedItemId(null);
+    } catch (error) {
+      console.error("Failed to rename group:", error);
+    }
+  };
+
   // Handle move conversation to group (drag & drop)
   const handleMoveConversationToGroup = async (
     conversationId: string,
     groupId: string | null,
   ) => {
-    console.log(
-      "[Sidebar] Moving conversation",
-      conversationId,
-      "to group",
-      groupId,
-    );
     try {
-      // Convert null to undefined for API compatibility
-      await updateConversation(conversationId, {
-        groupId: groupId ?? undefined,
-      });
-      console.log("[Sidebar] Conversation moved successfully");
+      // Pass groupId directly - signature accepts string | null
+      await updateConversation(conversationId, { groupId });
     } catch (error) {
       console.error("Failed to move conversation:", error);
     }
@@ -200,19 +221,18 @@ export function Sidebar({
       </div>
 
       {/* Conversations list */}
-      <div className="flex-1 overflow-y-auto p-2">
-        <ConversationList
-          conversations={conversations}
-          groups={groups}
-          currentConversationId={currentConversationId}
-          onConversationClick={setCurrentConversationId}
-          onConversationDelete={handleConversationDelete}
-          onConversationRename={handleConversationRename}
-          onGroupDelete={handleGroupDelete}
-          onGroupRename={handleGroupRename}
-          onMoveConversationToGroup={handleMoveConversationToGroup}
-        />
-      </div>
+      <ConversationList
+        conversations={conversations}
+        groups={groups}
+        currentConversationId={currentConversationId}
+        onConversationClick={setCurrentConversationId}
+        onConversationDelete={handleConversationDelete}
+        onConversationRename={handleConversationRename}
+        onConversationShare={onConversationShare}
+        onGroupDelete={handleGroupDelete}
+        onGroupRename={handleGroupRename}
+        onMoveConversationToGroup={handleMoveConversationToGroup}
+      />
 
       {/* New Group Modal */}
       <Modal
@@ -304,7 +324,7 @@ export function Sidebar({
             fullWidth
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === "Enter") submitConversationRename();
+              if (e.key === "Enter") submitGroupRename();
             }}
           />
           <div className="flex gap-2 justify-end">
@@ -316,7 +336,7 @@ export function Sidebar({
             </Button>
             <Button
               variant="primary"
-              onClick={submitConversationRename}
+              onClick={submitGroupRename}
               disabled={!groupName.trim()}
             >
               Save

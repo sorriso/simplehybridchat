@@ -75,7 +75,7 @@ def client(arango_container_function, setup_ollama):
         logger.error(f"Available routes: {routes}")
         raise RuntimeError("Chat routes failed to register")
     
-    logger.info("âœ“ Chat routes registered")
+    logger.info("Ã¢Å“â€œ Chat routes registered")
     
     yield TestClient(app)
 
@@ -132,7 +132,7 @@ def test_stream_chat_success(client, auth_headers, test_conversation):
     import os
     
     # Log test start and configuration
-    print(f"\nðŸ§ª Starting test_stream_chat_success", flush=True)
+    print(f"\nÃ°Å¸Â§Âª Starting test_stream_chat_success", flush=True)
     print(f"   LLM_PROVIDER: {os.environ.get('LLM_PROVIDER')}", flush=True)
     print(f"   OLLAMA_BASE_URL: {os.environ.get('OLLAMA_BASE_URL')}", flush=True)
     print(f"   OLLAMA_TIMEOUT: {os.environ.get('OLLAMA_TIMEOUT')}", flush=True)
@@ -152,17 +152,17 @@ def test_stream_chat_success(client, auth_headers, test_conversation):
             timeout=45.0  # Add explicit timeout
         ) as response:
             elapsed = time.time() - start_time
-            print(f"   âœ“ Response received in {elapsed:.2f}s", flush=True)
+            print(f"   Ã¢Å“â€œ Response received in {elapsed:.2f}s", flush=True)
             print(f"   Status: {response.status_code}", flush=True)
             
             assert response.status_code == 200
             assert "text/event-stream" in response.headers["content-type"]
             
-            print(f"   âœ“ Test passed\n", flush=True)
+            print(f"   Ã¢Å“â€œ Test passed\n", flush=True)
     
     except Exception as e:
         elapsed = time.time() - start_time
-        print(f"   âœ— Test failed after {elapsed:.2f}s", flush=True)
+        print(f"   Ã¢Å“â€” Test failed after {elapsed:.2f}s", flush=True)
         print(f"   Error: {e}\n", flush=True)
         raise
 

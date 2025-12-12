@@ -25,8 +25,8 @@ class FileResponse(CamelCaseModel):
     File response
     
     Inherits from CamelCaseModel for automatic camelCase serialization:
-    - uploaded_at → uploadedAt
-    - uploaded_by → uploadedBy
+    - uploaded_at â†’ uploadedAt
+    - uploaded_by â†’ uploadedBy
     
     url is Optional to handle cases where presigned URL generation fails
     """

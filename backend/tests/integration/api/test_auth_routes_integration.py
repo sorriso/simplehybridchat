@@ -15,7 +15,7 @@ Changes in v6.0:
 Integration tests for authentication routes
 
 Changes in v5:
-- Fixed cleanup: existing["_key"] â†’ existing["id"]
+- Fixed cleanup: existing["_key"] Ã¢â€ â€™ existing["id"]
 - Final cleanup of remaining _key references
 
 Changes in v4:

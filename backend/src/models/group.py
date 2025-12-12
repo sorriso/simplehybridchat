@@ -1,6 +1,10 @@
 """
 Path: backend/src/models/group.py
-Version: 1
+Version: 2
+
+Changes in v2:
+- CRITICAL FIX: GroupCreate now inherits from BaseRequestModel to accept camelCase
+- Frontend sends { name: "..." } which is now properly received
 
 Conversation group models for API requests/responses
 Groups are used to organize conversations in the sidebar
@@ -18,13 +22,23 @@ class GroupBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Group name")
 
 
-class GroupCreate(GroupBase):
-    """Group creation request"""
-    pass
+class GroupCreate(BaseRequestModel):
+    """
+    Group creation request
+    
+    FIXED v2: Inherits from BaseRequestModel to accept camelCase from frontend
+    Frontend sends: { "name": "Group Name" }
+    Backend receives: GroupCreate(name="Group Name")
+    """
+    name: str = Field(..., min_length=1, max_length=100, description="Group name")
 
 
-class GroupUpdate(BaseModel):
-    """Group update request (all fields optional)"""
+class GroupUpdate(BaseRequestModel):
+    """
+    Group update request (all fields optional)
+    
+    Inherits from BaseRequestModel to accept camelCase from frontend
+    """
     name: str | None = Field(None, min_length=1, max_length=100)
 
 
@@ -33,9 +47,9 @@ class GroupResponse(CamelCaseModel):
     Group response (no sensitive data)
     
     Inherits from CamelCaseModel for automatic camelCase serialization:
-    - owner_id → ownerId
-    - conversation_ids → conversationIds
-    - created_at → createdAt
+    - owner_id â†’ ownerId
+    - conversation_ids â†’ conversationIds
+    - created_at â†’ createdAt
     """
     id: str
     name: str

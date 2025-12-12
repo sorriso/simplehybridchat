@@ -1,14 +1,20 @@
 """
 Path: backend/tests/unit/services/test_user_service.py
-Version: 3
+Version: 4
 
 Changes in v3:
-- Fixed user1["_key"] → user1["id"] (line 157)
-- Fixed user2["_key"] → user2["id"] (line 161)
+Changes in v4:
+- FIX: UserService now instantiated with db parameter
+- Changed from: UserService() + service.user_repo.db = mock_db
+- Changed to: UserService(db=mock_db)
+- Reason: UserService.__init__() should receive db parameter like other services
+
+- Fixed user1["_key"] â†’ user1["id"] (line 157)
+- Fixed user2["_key"] â†’ user2["id"] (line 161)
 
 Changes in v2:
-- Modified all user dict mocks: {"_key": ...} → {"id": ...}
-- Modified all user accesses: user["_key"] → user["id"]
+- Modified all user dict mocks: {"_key": ...} â†’ {"id": ...}
+- Modified all user accesses: user["_key"] â†’ user["id"]
 - Fixed test_delete_self_forbidden: expects 403 not 400
 - Tests now use middleware format (id) for current_user mocks
 
@@ -41,10 +47,8 @@ def mock_db():
 
 @pytest.fixture
 def user_service(mock_db):
-    """Provide UserService with mocked repository"""
-    service = UserService()
-    service.user_repo.db = mock_db
-    return service
+    """Provide UserService with mocked database"""
+    return UserService(db=mock_db)
 
 
 class TestUserService:

@@ -3,8 +3,8 @@ Path: backend/tests/unit/repositories/test_user_repository.py
 Version: 2
 
 Changes in v2:
-- Modified all assertions: assert "_key" in → assert "id" in
-- Modified all user accesses: user["_key"] → user["id"]
+- Modified all assertions: assert "_key" in â†’ assert "id" in
+- Modified all user accesses: user["_key"] â†’ user["id"]
 - Tests now verify repository returns 'id' from MockDatabase
 
 Unit tests for UserRepository

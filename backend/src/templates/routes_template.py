@@ -258,11 +258,11 @@ async def toggle_resource_status(
 # ============================================================================
 
 # Frontend-compatible response formats:
-# - POST /api/resources → {"resource": {...}}
-# - GET /api/resources → {"resources": [...]}
-# - GET /api/resources/{id} → {"resource": {...}}
-# - PUT /api/resources/{id} → {"resource": {...}}
-# - DELETE /api/resources/{id} → {"success": true, "message": "..."}
+# - POST /api/resources â†’ {"resource": {...}}
+# - GET /api/resources â†’ {"resources": [...]}
+# - GET /api/resources/{id} â†’ {"resource": {...}}
+# - PUT /api/resources/{id} â†’ {"resource": {...}}
+# - DELETE /api/resources/{id} â†’ {"success": true, "message": "..."}
 
 # Remember to create corresponding response models in src/models/responses.py:
 # - SingleResourceResponse (wraps single resource)

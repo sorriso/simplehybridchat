@@ -3,8 +3,8 @@ Path: backend/tests/unit/database/test_arango_adapter.py
 Version: 2
 
 Changes in v2:
-- Modified all assertions: assert "_key" in → assert "id" in
-- Modified all document accesses: doc["_key"] → doc["id"]
+- Modified all assertions: assert "_key" in â†’ assert "id" in
+- Modified all document accesses: doc["_key"] â†’ doc["id"]
 - Tests now verify adapter returns 'id' (not '_key')
 - Matches production adapter behavior (v3)
 

@@ -1,6 +1,15 @@
 """
 Path: backend/tests/unit/repositories/test_message_repository.py
-Version: 1
+Version: 3
+
+Changes in v3:
+- FIX: Line 102 assert "timestamp" -> assert "created_at"
+- FIX: Line 114 "timestamp" -> "created_at"
+- Reason: MessageRepository.create_message() uses created_at field
+
+Changes in v2:
+- FIX: Replaced all "timestamp" fields with "created_at"
+- Reason: MessageRepository and message.py v3 use created_at field
 
 Unit tests for MessageRepository
 """
@@ -99,7 +108,7 @@ class TestMessageRepository:
         assert result["conversation_id"] == "conv-1"
         assert result["role"] == "user"
         assert result["content"] == "Test message"
-        assert "timestamp" in result
+        assert "created_at" in result
         assert "id" in result
     
     def test_delete_by_conversation(self, message_repo, mock_db):
@@ -111,7 +120,7 @@ class TestMessageRepository:
                 "conversation_id": "conv-1",
                 "role": "user",
                 "content": f"Message {i}",
-                "timestamp": datetime.utcnow()
+                "created_at": datetime.utcnow()
             })
         mock_db.create("messages", {
             "conversation_id": "conv-2",

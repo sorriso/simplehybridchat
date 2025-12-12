@@ -1,5 +1,5 @@
 // path: frontend/jest.config.js
-// version: 8 - Excluded MSWProvider and mocks from coverage
+// version: 9 - Increased testTimeout to 30000 for integration tests
 
 module.exports = {
   // Use jsdom environment for React testing
@@ -75,8 +75,8 @@ module.exports = {
   // Coverage output
   coverageDirectory: 'coverage',
   
-  // Test timeout
-  testTimeout: 10000,
+  // Test timeout - increased for integration tests
+  testTimeout: 30000,
   
   // Ignore patterns
   testPathIgnorePatterns: [

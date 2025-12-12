@@ -101,7 +101,7 @@ def _cleanup_all_containers():
         containers = client.containers.list(all=True, filters=filters)
         
         if not containers:
-            print("✓ No testcontainers found")
+            print("âœ“ No testcontainers found")
             print("="*80 + "\n")
             return
         
@@ -124,19 +124,19 @@ def _cleanup_all_containers():
                 
                 # Remove with volumes
                 container.remove(force=True, v=True)
-                print("✓ Removed")
+                print("âœ“ Removed")
                 removed += 1
                 
             except Exception as e:
-                print(f"✗ Failed: {e}")
+                print(f"âœ— Failed: {e}")
                 failed += 1
         
         print(f"\nSummary: {removed} removed, {failed} failed")
         
     except ImportError:
-        print("⚠ Docker package not installed, skipping container cleanup")
+        print("âš  Docker package not installed, skipping container cleanup")
     except Exception as e:
-        print(f"⚠ Error during cleanup: {e}")
+        print(f"âš  Error during cleanup: {e}")
     
     print("="*80 + "\n")
 

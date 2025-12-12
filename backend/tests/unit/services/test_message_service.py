@@ -1,6 +1,11 @@
 """
 Path: backend/tests/unit/services/test_message_service.py
-Version: 1
+Version: 2
+
+Changes in v2:
+- FIX: Replaced all "timestamp" fields with "created_at" in test mocks
+- Reason: MessageResponse model changed from timestamp to created_at (message.py v3)
+- Affects: test_get_conversation_messages_as_owner, test_get_conversation_messages_with_shared_access, test_get_message_count
 
 Unit tests for MessageService
 """
@@ -76,13 +81,13 @@ class TestMessageServiceRead:
             "conversation_id": owned_conversation["id"],
             "role": "user",
             "content": "Hello",
-            "timestamp": datetime(2024, 1, 15, 10, 0, 0)
+            "created_at": datetime(2024, 1, 15, 10, 0, 0)
         })
         mock_db.create("messages", {
             "conversation_id": owned_conversation["id"],
             "role": "assistant",
             "content": "Hi there",
-            "timestamp": datetime(2024, 1, 15, 10, 0, 5)
+            "created_at": datetime(2024, 1, 15, 10, 0, 5)
         })
         
         result = message_service.get_conversation_messages(owned_conversation["id"], current_user)
@@ -98,7 +103,7 @@ class TestMessageServiceRead:
             "conversation_id": shared_conversation["id"],
             "role": "user",
             "content": "Test",
-            "timestamp": datetime.utcnow()
+            "created_at": datetime.utcnow()
         })
         
         result = message_service.get_conversation_messages(shared_conversation["id"], current_user)
@@ -208,7 +213,7 @@ class TestMessageServiceCount:
                 "conversation_id": owned_conversation["id"],
                 "role": "user",
                 "content": f"Message {i}",
-                "timestamp": datetime.utcnow()
+                "created_at": datetime.utcnow()
             })
         
         result = message_service.get_message_count(owned_conversation["id"])

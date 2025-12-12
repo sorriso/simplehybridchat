@@ -1,63 +1,59 @@
 # path: docker-compose.yml
-# version: 4.0
+# version: 5.2
+#
+# Changes in v5.2:
+# - FIXED: Frontend port mapping changed from 3000:80 to 3000:3000
+# - Reason: New Dockerfile uses Next.js standalone on port 3000, not Caddy on port 80
 #
 # Development environment ONLY
-
-version: '3.8'
 
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: chatbot-backend
+    container_name: backend
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
-      - ENVIRONMENT=development
-      - LOG_LEVEL=DEBUG
+      # Docker-specific overrides (services use container names)
       - ARANGO_HOST=arangodb
-      - ARANGO_PORT=8529
-      - ARANGO_DATABASE=chatbot
-      - ARANGO_USER=root
-      - ARANGO_PASSWORD=changeme
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_SECURE=false
+      - MINIO_HOST=minio
       - OLLAMA_BASE_URL=http://ollama:11434
-      - CORS_ORIGINS=http://localhost:3000
 #    volumes:
 #      - ./backend/src:/app/src:ro
     depends_on:
       - arangodb
       - minio
+      - ollama
     networks:
       - chatbot
     restart: unless-stopped
 
-#   frontend:
-#     build:
-#       context: ./frontend
-#       dockerfile: Dockerfile
-#     container_name: chatbot-frontend
-#     ports:
-#       - "3000:80"
-#     environment:
-#       - NODE_ENV=development
-#       - NEXT_PUBLIC_API_URL=http://localhost:8000/api
-# #    volumes:
-# #      - ./frontend/src:/app/src:ro
-# #      - ./frontend/public:/app/public:ro
-#     depends_on:
-#       - backend
-#     networks:
-#       - chatbot
-#     restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+#    volumes:
+#      - ./frontend/src:/app/src:ro
+#      - ./frontend/public:/app/public:ro
+    depends_on:
+      - backend
+    networks:
+      - chatbot
+    restart: unless-stopped
 
   arangodb:
     image: arangodb:latest
-    container_name: chatbot-arangodb
+    container_name: arangodb
     environment:
       - ARANGO_ROOT_PASSWORD=changeme
     ports:
@@ -70,7 +66,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: chatbot-minio
+    container_name: minio
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -86,7 +82,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    container_name: chatbot-ollama
+    container_name: ollama
     ports:
       - "11434:11434"
     volumes:

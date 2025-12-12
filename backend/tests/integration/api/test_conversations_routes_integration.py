@@ -1,6 +1,10 @@
 """
 Path: backend/tests/integration/api/test_conversations_routes_integration.py
-Version: 2.0
+Version: 3
+
+Changes in v3:
+- FIX: Lines 300, 306 - "timestamp" changed to "created_at"
+- Reason: MessageResponse expects created_at field
 
 Changes in v2:
 - FIXED: All db.create() now use snake_case field names
@@ -114,19 +118,19 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         db.create("conversations", {
             "title": "Conv 1",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         db.create("conversations", {
             "title": "Conv 2",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         response = client.get(
@@ -147,11 +151,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Test Conv",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         response = client.get(
@@ -173,11 +177,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Old Title",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         response = client.put(
@@ -199,11 +203,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "To Delete",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         response = client.delete(
@@ -230,11 +234,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "To Share",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         response = client.post(
@@ -258,11 +262,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Shared Conv",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": ["group-1", "group-2"],  # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": ["group-1", "group-2"],  # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         response = client.post(
@@ -285,25 +289,25 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Test Conv",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         # Create messages with SNAKE_CASE
         db.create("messages", {
-            "conversation_id": conv["id"],            # â† snake_case
+            "conversation_id": conv["id"],            # Ã¢â€ Â snake_case
             "role": "user",
             "content": "Hello",
-            "timestamp": datetime.utcnow()
+            "created_at": datetime.utcnow()
         })
         db.create("messages", {
-            "conversation_id": conv["id"],            # â† snake_case
+            "conversation_id": conv["id"],            # Ã¢â€ Â snake_case
             "role": "assistant",
             "content": "Hi there",
-            "timestamp": datetime.utcnow()
+            "created_at": datetime.utcnow()
         })
         
         response = client.get(
@@ -333,11 +337,11 @@ class TestConversationPermissions:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Root's Conv",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         # Login as user2
@@ -363,11 +367,11 @@ class TestConversationPermissions:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Root's Conv",
-            "owner_id": root_user["id"],              # â† snake_case
-            "shared_with_group_ids": [],              # â† snake_case
-            "group_id": None,                         # â† snake_case
-            "created_at": datetime.utcnow(),          # â† snake_case
-            "updated_at": datetime.utcnow()           # â† snake_case
+            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
+            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
+            "group_id": None,                         # Ã¢â€ Â snake_case
+            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
+            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
         })
         
         # Login as user2

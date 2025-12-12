@@ -154,87 +154,46 @@ class AuthStatus(CamelCaseModel):
     role: Optional[str] = None
 
 
-class SsoConfigData(BaseModel):
+class SsoConfigData(CamelCaseModel):
     """
-    FRONTEND COMPATIBILITY: SSO configuration structure
+    SSO configuration data
     
-    Frontend expects camelCase:
-    {
-      "tokenHeader": "X-Auth-Token",
-      "nameHeader": "X-User-Name",
-      "emailHeader": "X-User-Email"
-    }
+    Fields serialized to camelCase:
+    - token_header → tokenHeader
+    - name_header → nameHeader
+    - email_header → emailHeader
+    - first_name_header → firstNameHeader
+    - last_name_header → lastNameHeader
     """
-    token_header: str = Field(alias="tokenHeader")
-    name_header: Optional[str] = Field(None, alias="nameHeader")
-    email_header: Optional[str] = Field(None, alias="emailHeader")
-    first_name_header: Optional[str] = Field(None, alias="firstNameHeader")
-    last_name_header: Optional[str] = Field(None, alias="lastNameHeader")
-    
-    class Config:
-        populate_by_name = True
+    token_header: str
+    name_header: Optional[str] = None
+    email_header: Optional[str] = None
+    first_name_header: Optional[str] = None
+    last_name_header: Optional[str] = None
 
 
-class AuthConfigData(BaseModel):
+class AuthConfigData(CamelCaseModel):
     """
-    FRONTEND COMPATIBILITY: Authentication configuration data
+    Authentication configuration
     
-    Frontend expects:
-    {
-      "mode": "local",
-      "allowMultiLogin": false,
-      "maintenanceMode": false,
-      "ssoConfig": null
-    }
+    Fields serialized to camelCase:
+    - allow_multi_login → allowMultiLogin
+    - maintenance_mode → maintenanceMode
+    - sso_config → ssoConfig
     """
-    mode: str = Field(..., pattern="^(none|local|sso)$")
-    allow_multi_login: bool = Field(alias="allowMultiLogin")
-    maintenance_mode: bool = Field(alias="maintenanceMode")
-    sso_config: Optional[SsoConfigData] = Field(None, alias="ssoConfig")
-    
-    class Config:
-        populate_by_name = True
+    mode: str  # "none", "local", "sso"
+    allow_multi_login: bool
+    maintenance_mode: bool
+    sso_config: Optional[SsoConfigData] = None
 
 
 class ConfigResponse(BaseModel):
     """
-    FRONTEND COMPATIBILITY: Configuration response wrapper
+    FRONTEND COMPATIBILITY: Config response wrapper
     
-    Frontend expects EXACTLY this structure:
+    Frontend expects:
     {
-      "config": {
-        "mode": "local",
-        "allowMultiLogin": false,
-        "maintenanceMode": false,
-        "ssoConfig": null
-      }
+      "config": {...}
     }
     """
     config: AuthConfigData
-
-
-class AuthConfig(CamelCaseModel):
-    """
-    DEPRECATED - Use ConfigResponse instead
-    Kept for backward compatibility
-    
-    Fields serialized to camelCase:
-    - auth_mode → authMode
-    - allow_registration → allowRegistration
-    - sso_enabled → ssoEnabled
-    - sso_token_header → ssoTokenHeader
-    - sso_name_header → ssoNameHeader
-    - sso_email_header → ssoEmailHeader
-    """
-    auth_mode: str
-    allow_registration: bool
-    sso_enabled: bool
-    sso_token_header: Optional[str] = None
-    sso_name_header: Optional[str] = None
-    sso_email_header: Optional[str] = None
-
-
-class PasswordChange(BaseModel):
-    """Password change request"""
-    current_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=8, max_length=100)

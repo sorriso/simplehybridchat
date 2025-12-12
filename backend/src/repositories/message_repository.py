@@ -1,10 +1,14 @@
 """
 Path: backend/src/repositories/message_repository.py
-Version: 2
+Version: 3
+
+Changes in v3:
+- FIX: Conditional import of get_database to avoid import errors in tests
+- Only import when db is None, allows tests with MockDatabase
 
 Changes in v2:
-- Fixed __init__: collection_name → collection
-- Fixed all methods: self.collection_name → self.collection
+- Fixed __init__: collection_name to collection
+- Fixed all methods: self.collection_name to self.collection
 - Added factory pattern for db initialization
 
 Repository for managing messages
@@ -30,8 +34,8 @@ class MessageRepository(BaseRepository):
         Args:
             db: Database instance (optional, uses factory if not provided)
         """
-        from src.database.factory import get_database
         if db is None:
+            from src.database.factory import get_database
             db = get_database()
         super().__init__(db=db, collection="messages")
     
@@ -50,14 +54,14 @@ class MessageRepository(BaseRepository):
             limit: Max results
             
         Returns:
-            List of messages sorted by timestamp ASC (chronological order)
+            List of messages sorted by created_at ASC (chronological order)
         """
         messages = self.db.get_all(
             self.collection,
             filters={"conversation_id": conversation_id},
             skip=skip,
             limit=limit,
-            sort={"timestamp": 1}  # Ascending order (oldest first)
+            sort={"created_at": 1}  # Ascending order (oldest first)
         )
         return messages
     
@@ -117,7 +121,7 @@ class MessageRepository(BaseRepository):
             "conversation_id": conversation_id,
             "role": role,
             "content": content,
-            "timestamp": datetime.utcnow()
+            "created_at": datetime.utcnow()
         }
         
         return self.create(message_data)

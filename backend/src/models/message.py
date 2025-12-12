@@ -1,6 +1,12 @@
 """
 Path: backend/src/models/message.py
-Version: 2
+Version: 3
+
+Changes in v3:
+- CRITICAL FIX: Changed MessageResponse.timestamp -> created_at
+- Changed MessageInDB.timestamp -> created_at  
+- Matches field name used in chat_service.py (created_at)
+- Fixes Pydantic validation error when loading messages from DB
 
 Changes in v2:
 - MessageResponse now inherits from CamelCaseModel
@@ -32,16 +38,16 @@ class MessageResponse(CamelCaseModel):
     Message response
     
     Inherits from CamelCaseModel for automatic camelCase serialization:
-    - conversation_id → conversationId
+    - conversation_id Ã¢â€ â€™ conversationId
     """
     id: str
     conversation_id: str
     role: str
     content: str
-    timestamp: datetime
+    created_at: datetime
 
 
 class MessageInDB(MessageBase):
     """Message as stored in database"""
     conversation_id: str
-    timestamp: datetime
+    created_at: datetime

@@ -1,12 +1,17 @@
 """
 Path: backend/src/repositories/base.py
-Version: 1
+Version: 2
+
+Changes in v2:
+- ADDED: bulk_create() method for batch document creation
+- ADDED: find_many() method (already existed as get_all, this is an alias)
+- Reason: Tests require these methods for comprehensive CRUD operations
 
 Base repository with generic CRUD operations
 All repositories should inherit from this class
 """
 
-from typing import Optional, List, Dict, Any, TypeVar, Generic
+from typing import Optional, List, Dict, Any, TypeVar, Generic, Tuple
 import logging
 
 from src.database.interface import IDatabase
@@ -33,7 +38,7 @@ class BaseRepository(Generic[T]):
                 return self.find_one({"email": email})
     """
     
-    def __init__(self, db: IDatabase, collection: str):
+    def __init__(self, db: IDatabase = None, collection: str = None):
         """
         Initialize repository
         
@@ -41,6 +46,9 @@ class BaseRepository(Generic[T]):
             db: Database instance
             collection: Collection/table name
         """
+        if db is None:
+            from src.database.factory import get_database
+            db = get_database()
         self.db = db
         self.collection = collection
     
@@ -75,6 +83,36 @@ class BaseRepository(Generic[T]):
             logger.error(f"Failed to create document in {self.collection}: {e}")
             raise
     
+    def bulk_create(self, documents: List[Dict[str, Any]]) -> List[T]:
+        """
+        Create multiple documents in batch
+        
+        Args:
+            documents: List of document data dicts
+            
+        Returns:
+            List of created documents with generated IDs
+            
+        Raises:
+            DatabaseException: If creation fails
+            
+        Example:
+            users = repo.bulk_create([
+                {"name": "John", "email": "john@example.com"},
+                {"name": "Jane", "email": "jane@example.com"}
+            ])
+        """
+        created = []
+        for doc_data in documents:
+            try:
+                doc = self.create(doc_data)
+                created.append(doc)
+            except DatabaseException as e:
+                logger.error(f"Failed to create document in bulk: {e}")
+                # Continue with other documents
+                continue
+        return created
+    
     # ========================================================================
     # READ
     # ========================================================================
@@ -94,11 +132,11 @@ class BaseRepository(Generic[T]):
         """
         try:
             document = self.db.get_by_id(self.collection, doc_id)
-            if document:
-                logger.debug(f"Retrieved document from {self.collection}: {doc_id}")
             return document
-        except Exception as e:
-            logger.warning(f"Error getting document {doc_id}: {e}")
+        except NotFoundError:
+            return None
+        except DatabaseException as e:
+            logger.error(f"Error getting document {doc_id}: {e}")
             return None
     
     def get_all(
@@ -109,46 +147,63 @@ class BaseRepository(Generic[T]):
         sort: Optional[Dict[str, int]] = None
     ) -> List[T]:
         """
-        Get all documents with optional filters and pagination
+        Get all documents matching filters
         
         Args:
-            filters: Query filters (e.g., {"status": "active"})
-            skip: Number to skip (for pagination)
-            limit: Maximum to return
-            sort: Sort specification (e.g., {"createdAt": -1})
+            filters: Optional filter criteria
+            skip: Number of documents to skip
+            limit: Maximum documents to return
+            sort: Sort specification (field: direction)
             
         Returns:
-            List of documents
+            List of matching documents
             
         Example:
-            # Get active users, page 2, 10 per page
-            users = repo.get_all(
-                filters={"status": "active"},
-                skip=10,
-                limit=10,
-                sort={"createdAt": -1}
-            )
+            active_users = repo.get_all(filters={"status": "active"}, limit=50)
         """
         try:
-            documents = self.db.get_all(
+            documents = self.db.find_many(
                 self.collection,
-                filters=filters,
+                filters=filters or {},
                 skip=skip,
                 limit=limit,
                 sort=sort
             )
-            logger.debug(f"Retrieved {len(documents)} documents from {self.collection}")
             return documents
-        except Exception as e:
-            logger.error(f"Error retrieving documents from {self.collection}: {e}")
+        except DatabaseException as e:
+            logger.error(f"Error getting documents: {e}")
             return []
+    
+    def find_many(
+        self,
+        filters: Optional[Dict[str, Any]] = None,
+        skip: int = 0,
+        limit: int = 100,
+        sort: Optional[Dict[str, int]] = None
+    ) -> List[T]:
+        """
+        Alias for get_all() - find multiple documents matching filters
+        
+        Args:
+            filters: Optional filter criteria
+            skip: Number of documents to skip
+            limit: Maximum documents to return
+            sort: Sort specification (field: direction)
+            
+        Returns:
+            List of matching documents
+            
+        Example:
+            active_users = repo.find_many(filters={"status": "active"})
+        """
+        return self.get_all(filters=filters, skip=skip, limit=limit, sort=sort)
     
     def find_one(self, filters: Dict[str, Any]) -> Optional[T]:
         """
         Find first document matching filters
         
         Args:
-            filters: Query filters
+            filters: Filter criteria
             
         Returns:
             First matching document or None
@@ -157,60 +212,28 @@ class BaseRepository(Generic[T]):
             user = repo.find_one({"email": "john@example.com"})
         """
         try:
-            document = self.db.find_one(self.collection, filters)
-            if document:
-                logger.debug(f"Found document in {self.collection} matching {filters}")
-            return document
-        except Exception as e:
-            logger.warning(f"Error finding document: {e}")
+            return self.db.find_one(self.collection, filters)
+        except DatabaseException as e:
+            logger.error(f"Error finding document: {e}")
             return None
-    
-    def find_many(
-        self,
-        filters: Dict[str, Any],
-        skip: int = 0,
-        limit: int = 100,
-        sort: Optional[Dict[str, int]] = None
-    ) -> List[T]:
-        """
-        Find multiple documents matching filters
-        
-        Args:
-            filters: Query filters (required)
-            skip: Number to skip
-            limit: Maximum to return
-            sort: Sort specification
-            
-        Returns:
-            List of matching documents
-            
-        Example:
-            active_users = repo.find_many(
-                {"status": "active"},
-                limit=50
-            )
-        """
-        return self.get_all(filters=filters, skip=skip, limit=limit, sort=sort)
     
     def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
         """
-        Count documents in collection
+        Count documents matching filters
         
         Args:
-            filters: Optional query filters
+            filters: Optional filter criteria
             
         Returns:
-            Number of matching documents
+            Count of matching documents
             
         Example:
-            total = repo.count()
-            active_count = repo.count({"status": "active"})
+            total_users = repo.count()
+            active_users = repo.count({"status": "active"})
         """
         try:
-            count = self.db.count(self.collection, filters=filters)
-            logger.debug(f"Counted {count} documents in {self.collection}")
-            return count
-        except Exception as e:
+            return self.db.count(self.collection, filters)
+        except DatabaseException as e:
             logger.error(f"Error counting documents: {e}")
             return 0
     
@@ -222,7 +245,7 @@ class BaseRepository(Generic[T]):
             doc_id: Document ID
             
         Returns:
-            True if exists, False otherwise
+            True if document exists
             
         Example:
             if repo.exists("user123"):
@@ -230,7 +253,7 @@ class BaseRepository(Generic[T]):
         """
         try:
             return self.db.exists(self.collection, doc_id)
-        except Exception:
+        except DatabaseException:
             return False
     
     # ========================================================================
@@ -300,72 +323,33 @@ class BaseRepository(Generic[T]):
             return False
     
     # ========================================================================
-    # UTILITIES
+    # PAGINATION
     # ========================================================================
     
     def get_paginated(
         self,
         page: int = 1,
-        per_page: int = 10,
+        per_page: int = 20,
         filters: Optional[Dict[str, Any]] = None,
         sort: Optional[Dict[str, int]] = None
-    ) -> tuple[List[T], int]:
+    ) -> Tuple[List[T], int]:
         """
         Get paginated results with total count
         
         Args:
             page: Page number (1-indexed)
             per_page: Items per page
-            filters: Query filters
+            filters: Optional filter criteria
             sort: Sort specification
             
         Returns:
             Tuple of (items, total_count)
             
         Example:
-            items, total = repo.get_paginated(page=2, per_page=10)
-            # Returns items 11-20 and total count
+            users, total = repo.get_paginated(page=2, per_page=10)
+            print(f"Showing {len(users)} of {total} users")
         """
-        # Calculate skip
         skip = (page - 1) * per_page
-        
-        # Get items
-        items = self.get_all(
-            filters=filters,
-            skip=skip,
-            limit=per_page,
-            sort=sort
-        )
-        
-        # Get total count
+        items = self.get_all(filters=filters, skip=skip, limit=per_page, sort=sort)
         total = self.count(filters=filters)
-        
         return items, total
-    
-    def bulk_create(self, documents: List[Dict[str, Any]]) -> List[T]:
-        """
-        Create multiple documents
-        
-        Args:
-            documents: List of documents to create
-            
-        Returns:
-            List of created documents
-            
-        Example:
-            users = repo.bulk_create([
-                {"name": "User 1"},
-                {"name": "User 2"}
-            ])
-        """
-        created = []
-        for doc in documents:
-            try:
-                created_doc = self.create(doc)
-                created.append(created_doc)
-            except DatabaseException as e:
-                logger.error(f"Failed to create document in bulk: {e}")
-                # Continue with other documents
-        
-        logger.info(f"Bulk created {len(created)}/{len(documents)} documents")
-        return created
