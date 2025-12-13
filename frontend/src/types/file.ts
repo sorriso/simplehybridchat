@@ -2,39 +2,44 @@
    version: 1 */
 
 /**
- * Uploaded file type
+ * File status during upload process
+ */
+export type FileStatus = "pending" | "uploading" | "completed" | "error";
+
+/**
+ * Pending file (during upload)
+ */
+export interface PendingFile {
+  id: string;
+  file: File;
+  progress: number; // 0-100
+  status: FileStatus;
+  error?: string;
+}
+
+/**
+ * Uploaded file (stored on server)
  */
 export interface UploadedFile {
   id: string;
   name: string;
   size: number;
-  mimeType: string;
+  type: string;
   url: string;
-  uploadedAt: Date;
-  status: "pending" | "processing" | "completed" | "error";
-  userId: string;
+  status: "completed";
+  uploadedAt: string;
 }
 
-export interface FileUploadRequest {
-  file: File;
-}
-
+/**
+ * File upload API response
+ */
 export interface FileUploadResponse {
   file: UploadedFile;
-  message: string;
 }
 
-export interface FileUploadProgress {
-  fileId: string;
-  progress: number; // 0-100
-  status: "uploading" | "processing" | "completed" | "error";
-}
-
-// Client-side file representation before upload
-export interface PendingFile {
-  id: string; // temporary client-side ID
-  file: File;
-  progress: number;
-  status: "pending" | "uploading" | "completed" | "error";
-  error?: string;
+/**
+ * File list API response
+ */
+export interface FileListResponse {
+  files: UploadedFile[];
 }

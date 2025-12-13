@@ -1,5 +1,5 @@
-/* path: tests/unit/lib/auth.test.unit.ts
-   version: 1 */
+/* path: frontend/tests/unit/lib/auth.test.unit.ts
+   version: 2 - FIXED: Use email instead of username for login */
 
    import { authApi, userManagementApi } from '@/lib/api/auth';
    import { apiClient } from '@/lib/api/client';
@@ -103,7 +103,7 @@
          const result = await authApi.login('testuser', 'password');
    
          expect(mockApiClient.post).toHaveBeenCalledWith('/api/auth/login', {
-           username: 'testuser',
+           email: 'testuser',
            password: 'password',
          });
          expect(result).toEqual(mockResponse);

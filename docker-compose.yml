@@ -32,24 +32,24 @@ services:
       - chatbot
     restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-#    volumes:
-#      - ./frontend/src:/app/src:ro
-#      - ./frontend/public:/app/public:ro
-    depends_on:
-      - backend
-    networks:
-      - chatbot
-    restart: unless-stopped
+#   frontend:
+#     build:
+#       context: ./frontend
+#       dockerfile: Dockerfile
+#     container_name: frontend
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - NODE_ENV=production
+#       - NEXT_PUBLIC_API_URL=http://localhost:8000
+# #    volumes:
+# #      - ./frontend/src:/app/src:ro
+# #      - ./frontend/public:/app/public:ro
+#     depends_on:
+#       - backend
+#     networks:
+#       - chatbot
+#     restart: unless-stopped
 
   arangodb:
     image: arangodb:latest

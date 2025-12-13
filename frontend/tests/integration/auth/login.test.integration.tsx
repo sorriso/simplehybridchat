@@ -1,5 +1,5 @@
 // path: tests/integration/auth/login.test.integration.tsx
-// version: 5 - Fixed validation test and onLogin return type (Promise<User>)
+// version: 6 - FIXED: Updated button text to match actual component ("Sign In" not "Log In")
 
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -22,11 +22,11 @@ describe('Login Integration', () => {
     
     renderWithProviders(<LoginForm onLogin={mockOnLogin} />)
     
-    // Try to submit with empty fields - HTML5 validation should prevent submission
-    const submitButton = screen.getByRole('button', { name: /log in/i })
+    // Try to submit with empty fields - validation should prevent submission
+    const submitButton = screen.getByRole('button', { name: /sign in/i })
     await user.click(submitButton)
     
-    // onLogin should not be called because HTML5 required validation prevents submission
+    // onLogin should not be called because validation prevents submission
     expect(mockOnLogin).not.toHaveBeenCalled()
   })
 
@@ -52,7 +52,7 @@ describe('Login Integration', () => {
     await user.type(passwordInput, 'password123')
     
     // Submit
-    const submitButton = screen.getByRole('button', { name: /log in/i })
+    const submitButton = screen.getByRole('button', { name: /sign in/i })
     await user.click(submitButton)
     
     // Verify onLogin was called with email and password
@@ -75,8 +75,8 @@ describe('Login Integration', () => {
   it('shows loading state', async () => {
     renderWithProviders(<LoginForm onLogin={mockOnLogin} loading={true} />)
     
-    // Button text changes to "Logging in..." when loading
-    const submitButton = screen.getByRole('button', { name: /logging in/i })
+    // Button text changes to "Signing in..." when loading
+    const submitButton = screen.getByRole('button', { name: /signing in/i })
     
     // Button should be disabled when loading
     expect(submitButton).toBeDisabled()

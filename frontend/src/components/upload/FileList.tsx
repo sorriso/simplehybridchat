@@ -1,9 +1,9 @@
 /* path: frontend/src/components/upload/FileList.tsx
    version: 1 */
 
-import { FileText, X, CheckCircle, AlertCircle, Loader } from "lucide-react";
-import { PendingFile, UploadedFile } from "@/types/file";
+import { X, CheckCircle, AlertCircle, FileText, Loader2 } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
+import type { PendingFile, UploadedFile } from "@/types/file";
 
 interface FileListProps {
   pendingFiles: PendingFile[];
@@ -13,7 +13,7 @@ interface FileListProps {
 }
 
 /**
- * Component to display list of files (pending and uploaded)
+ * Display list of pending and uploaded files
  */
 export function FileList({
   pendingFiles,
@@ -21,31 +21,10 @@ export function FileList({
   onRemovePending,
   onRemoveUploaded,
 }: FileListProps) {
-  /**
-   * Format file size to human readable format
-   */
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-  };
-
-  /**
-   * Get status icon for pending file
-   */
-  const getStatusIcon = (file: PendingFile) => {
-    switch (file.status) {
-      case "uploading":
-        return <Loader size={16} className="animate-spin text-blue-500" />;
-      case "completed":
-        return <CheckCircle size={16} className="text-green-500" />;
-      case "error":
-        return <AlertCircle size={16} className="text-red-500" />;
-      default:
-        return <FileText size={16} className="text-gray-400" />;
-    }
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   return (
@@ -54,7 +33,7 @@ export function FileList({
       {pendingFiles.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-gray-700 mb-2">
-            Pending Upload
+            Pending Files
           </h3>
           <div className="space-y-2">
             {pendingFiles.map((file) => (
@@ -62,36 +41,70 @@ export function FileList({
                 key={file.id}
                 className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
               >
-                {getStatusIcon(file)}
+                {/* Status icon */}
+                {file.status === "uploading" && (
+                  <Loader2
+                    size={16}
+                    className="text-blue-500 flex-shrink-0 animate-spin"
+                  />
+                )}
+                {file.status === "pending" && (
+                  <FileText size={16} className="text-gray-400 flex-shrink-0" />
+                )}
+                {file.status === "error" && (
+                  <AlertCircle
+                    size={16}
+                    className="text-red-500 flex-shrink-0"
+                  />
+                )}
+
+                {/* File info */}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
                     {file.file.name}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {formatFileSize(file.file.size)}
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-gray-500">
+                      {formatFileSize(file.file.size)}
+                    </p>
                     {file.status === "uploading" &&
-                      ` • ${Math.round(file.progress)}%`}
-                  </p>
-                  {file.status === "uploading" && (
-                    <div className="mt-1 w-full bg-gray-200 rounded-full h-1">
-                      <div
-                        className="bg-blue-500 h-1 rounded-full transition-all"
-                        style={{ width: `${file.progress}%` }}
-                      />
-                    </div>
-                  )}
-                  {file.error && (
-                    <p className="text-xs text-red-600 mt-1">{file.error}</p>
-                  )}
+                      file.progress !== undefined && (
+                        <>
+                          <span className="text-xs text-gray-400">•</span>
+                          <p className="text-xs text-blue-600">
+                            {file.progress}%
+                          </p>
+                        </>
+                      )}
+                    {file.status === "error" && file.error && (
+                      <>
+                        <span className="text-xs text-gray-400">•</span>
+                        <p className="text-xs text-red-600">{file.error}</p>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Progress bar */}
+                  {file.status === "uploading" &&
+                    file.progress !== undefined && (
+                      <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
+                        <div
+                          className="bg-blue-500 h-1 rounded-full transition-all duration-300"
+                          style={{ width: `${file.progress}%` }}
+                        />
+                      </div>
+                    )}
                 </div>
-                {file.status === "pending" && (
-                  <IconButton
-                    icon={X}
-                    size="sm"
-                    onClick={() => onRemovePending(file.id)}
-                    title="Remove"
-                  />
-                )}
+
+                {/* Remove button */}
+                <IconButton
+                  icon={X}
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onRemovePending(file.id)}
+                  title="Remove"
+                  disabled={file.status === "uploading"}
+                />
               </div>
             ))}
           </div>

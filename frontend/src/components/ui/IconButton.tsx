@@ -1,5 +1,5 @@
 /* path: frontend/src/components/ui/IconButton.tsx
-   version: 1 */
+   version: 2 - FIXED: Added secondary variant for consistency with Button component */
 
 import { ButtonHTMLAttributes, forwardRef } from "react";
 import { LucideIcon } from "lucide-react";
@@ -8,7 +8,7 @@ import clsx from "clsx";
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: LucideIcon;
   size?: "sm" | "md" | "lg";
-  variant?: "ghost" | "danger";
+  variant?: "ghost" | "secondary" | "danger";
 }
 
 /**
@@ -40,6 +40,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
           "disabled:opacity-50 disabled:cursor-not-allowed",
           {
             "hover:bg-gray-100 text-gray-600": variant === "ghost",
+            "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50":
+              variant === "secondary",
             "hover:bg-red-100 text-red-600": variant === "danger",
           },
           buttonSizes[size],

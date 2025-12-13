@@ -1,5 +1,5 @@
 /* path: frontend/src/components/sidebar/ConversationGroup.tsx
-   version: 2 */
+   version: 3 - FIXED: Added onConversationShare prop to pass to ConversationItem components */
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Folder, Trash2, Edit2 } from "lucide-react";
@@ -18,6 +18,7 @@ interface ConversationGroupProps {
   onConversationClick: (id: string) => void;
   onConversationDelete: (id: string) => void;
   onConversationRename: (id: string) => void;
+  onConversationShare: (id: string) => void;
   onGroupDelete: () => void;
   onGroupRename: () => void;
   onConversationDrop?: (conversationId: string, groupId: string) => void;
@@ -36,6 +37,7 @@ export function ConversationGroup({
   onConversationClick,
   onConversationDelete,
   onConversationRename,
+  onConversationShare,
   onGroupDelete,
   onGroupRename,
   onConversationDrop,
@@ -108,62 +110,50 @@ export function ConversationGroup({
             )}
           >
             {isExpanded ? (
-              <ChevronDown size={16} className="flex-shrink-0" />
+              <ChevronDown size={16} />
             ) : (
-              <ChevronRight size={16} className="flex-shrink-0" />
+              <ChevronRight size={16} />
             )}
-            <Folder size={16} className="flex-shrink-0" />
-            <span className="text-sm font-medium truncate">{group.name}</span>
-            <span className="text-xs text-gray-500 ml-auto">
-              ({groupConversations.length})
+            <Folder size={16} />
+            <span className="text-sm font-medium flex-1">{group.name}</span>
+            <span className="text-xs text-gray-500">
+              {groupConversations.length}
             </span>
           </button>
 
-          {/* Drop zone indicator */}
+          {/* Drop indicator */}
           {isDragOver && draggingConversationId && (
-            <div className="px-3 pb-2">
-              <div className="border-2 border-dashed border-primary-500 rounded-lg p-4 text-center">
-                <p className="text-sm text-primary-700 font-medium">
-                  Drop here to move to {group.name}
-                </p>
-              </div>
+            <div className="px-3 py-1">
+              <p className="text-xs text-primary-600">
+                Drop here to move to {group.name}
+              </p>
             </div>
           )}
         </div>
       </ContextMenu>
 
-      {/* Group conversations */}
+      {/* Conversations list */}
       {isExpanded && (
         <div className="ml-4 mt-1 space-y-1">
-          {groupConversations.map((conversation) => (
-            <ConversationItem
-              key={conversation.id}
-              conversation={conversation}
-              isActive={conversation.id === currentConversationId}
-              onClick={() => onConversationClick(conversation.id)}
-              onDelete={() => onConversationDelete(conversation.id)}
-              onRename={() => onConversationRename(conversation.id)}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
-              isDragging={draggingConversationId === conversation.id}
-            />
-          ))}
-          {groupConversations.length === 0 && (
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={clsx(
-                "px-3 py-4 rounded-lg transition-colors",
-                isDragOver
-                  ? "bg-primary-50 border-2 border-dashed border-primary-500"
-                  : "bg-gray-50",
-              )}
-            >
-              <p className="text-xs text-gray-500 italic text-center">
-                {isDragOver ? "Drop conversation here" : "No conversations"}
-              </p>
-            </div>
+          {groupConversations.length === 0 ? (
+            <p className="text-xs text-gray-400 italic px-3 py-2">
+              No conversations in this group
+            </p>
+          ) : (
+            groupConversations.map((conversation) => (
+              <ConversationItem
+                key={conversation.id}
+                conversation={conversation}
+                isActive={conversation.id === currentConversationId}
+                onClick={() => onConversationClick(conversation.id)}
+                onDelete={() => onConversationDelete(conversation.id)}
+                onRename={() => onConversationRename(conversation.id)}
+                onShare={() => onConversationShare(conversation.id)}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                isDragging={conversation.id === draggingConversationId}
+              />
+            ))
           )}
         </div>
       )}

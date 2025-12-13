@@ -1,14 +1,5 @@
 /* path: frontend/src/lib/utils/constants.ts
-   version: 6
-   
-   Changes in v6:
-   - ADDED: FILES_LIST endpoint for listing files
-   - Reason: Build error - FILES_LIST was referenced but not defined
-   
-   Changes in v5:
-   - ADDED: FILES_UPLOAD endpoint for file upload API
-   - Reason: Build error - FILES_UPLOAD was referenced but not defined
-*/
+   version: 7 - ADDED: FILES_UPLOAD and FILES_LIST for file upload API */
 
 export const API_ENDPOINTS = {
   AUTH_LOGIN: "/api/auth/login",

@@ -1,12 +1,15 @@
 /* path: frontend/src/components/settings/SettingsPanel.tsx
-   version: 4 - Fixed onSave type mismatch by wrapping updatePromptCustomization */
+   version: 9 - CRITICAL FIX: Moved useMemo BEFORE early return (Rules of Hooks) */
 
+import { useMemo } from "react";
 import { X, LogOut, ShieldAlert } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
 import { PromptCustomization } from "./PromptCustomization";
+import { UserManagementPanel } from "../admin/UserManagementPanel";
 import { useSettings } from "@/lib/hooks/useSettings";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { calculatePermissions } from "@/lib/utils/permissions";
 
 interface SettingsPanelProps {
   isOpen?: boolean;
@@ -20,13 +23,24 @@ export function SettingsPanel({ isOpen = true, onClose }: SettingsPanelProps) {
   const { settings, isSaving, updatePromptCustomization } = useSettings();
   const { user, logout, forceLogout, authMode } = useAuth();
 
+  // Memoize permissions to prevent re-renders (MUST be before early return)
+  const permissions = useMemo(
+    () => calculatePermissions(user, authMode),
+    [user, authMode],
+  );
+
+  // Check if user can access admin features
+  const canAccessUserManagement = permissions.isRoot || permissions.isManager;
+
   if (!isOpen) return null;
 
   const handleLogout = async () => {
-    await logout();
+    // Close panel FIRST to show login form immediately
     if (onClose) {
       onClose();
     }
+    // Then logout (user becomes null)
+    await logout();
   };
 
   const handleForceLogout = async () => {
@@ -34,7 +48,7 @@ export function SettingsPanel({ isOpen = true, onClose }: SettingsPanelProps) {
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-xl border-l border-gray-200 z-40">
+    <div className="fixed right-0 top-0 h-full w-[700px] bg-white shadow-xl border-l border-gray-200 z-40">
       <div className="flex flex-col h-full">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -96,6 +110,25 @@ export function SettingsPanel({ isOpen = true, onClose }: SettingsPanelProps) {
               isSaving={isSaving}
             />
           </div>
+
+          {/* User Management Section (Root/Manager only) */}
+          {canAccessUserManagement && user && (
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 mb-3">
+                User Management
+              </h3>
+              <UserManagementPanel
+                currentUser={user}
+                permissions={{
+                  canManageAllUsers: permissions.isRoot,
+                  canActivateDeactivateGroupMembers:
+                    permissions.canToggleUserStatus,
+                  canManageGroups: permissions.canViewGroups,
+                  canCreateGroups: permissions.canCreateGroups,
+                }}
+              />
+            </div>
+          )}
 
           {/* Theme Section (placeholder for future) */}
           <div>

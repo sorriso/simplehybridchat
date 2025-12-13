@@ -40,15 +40,15 @@ export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
     <div
       {...getRootProps()}
       className={`
-        border-2 border-dashed rounded-lg p-8
-        transition-colors cursor-pointer
-        ${
-          isDragActive
-            ? "border-primary-500 bg-primary-50"
-            : "border-gray-300 bg-gray-50 hover:bg-gray-100"
-        }
-        ${disabled ? "opacity-50 cursor-not-allowed" : ""}
-      `}
+           border-2 border-dashed rounded-lg p-8
+           transition-colors cursor-pointer
+           ${
+             isDragActive
+               ? "border-primary-500 bg-primary-50"
+               : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+           }
+           ${disabled ? "opacity-50 cursor-not-allowed" : ""}
+         `}
     >
       <input {...getInputProps()} />
 

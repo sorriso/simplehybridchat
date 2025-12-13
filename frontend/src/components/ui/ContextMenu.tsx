@@ -113,14 +113,14 @@ export function ContextMenu({ items, children }: ContextMenuProps) {
                 setIsOpen(false);
               }}
               className={`
-                w-full px-4 py-2 text-left text-sm flex items-center gap-2
-                transition-colors focus:outline-none focus:bg-gray-100
-                ${
-                  item.variant === "danger"
-                    ? "text-red-600 hover:bg-red-50 focus:bg-red-50"
-                    : "text-gray-700 hover:bg-gray-100"
-                }
-              `}
+                   w-full px-4 py-2 text-left text-sm flex items-center gap-2
+                   transition-colors focus:outline-none focus:bg-gray-100
+                   ${
+                     item.variant === "danger"
+                       ? "text-red-600 hover:bg-red-50 focus:bg-red-50"
+                       : "text-gray-700 hover:bg-gray-100"
+                   }
+                 `}
             >
               {item.icon && <span className="w-4 h-4">{item.icon}</span>}
               <span className={item.variant === "danger" ? "text-red-600" : ""}>

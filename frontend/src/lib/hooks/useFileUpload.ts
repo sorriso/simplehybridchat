@@ -1,5 +1,12 @@
 /* path: frontend/src/lib/hooks/useFileUpload.ts
-   version: 2 - Fixed type checking for ALLOWED_FILE_TYPES.includes() */
+   version: 4 - FIXED: Added deleteUploadedFile method
+   
+   Changes in v4:
+   - ADDED: deleteUploadedFile() to delete file from server and state
+   - Reason: FileUploadPanel requires this method
+   
+   Changes in v3:
+   - FIXED: Type-safe file type validation with ALLOWED_FILE_TYPES */
 
 import { useState, useCallback } from "react";
 import { filesApi } from "../api/files";
@@ -30,8 +37,9 @@ export function useFileUpload() {
         return;
       }
 
-      // Check file type
-      if (!UI_CONSTANTS.ALLOWED_FILE_TYPES.includes(file.type as any)) {
+      // Check file type - cast to readonly array for type-safe includes
+      const allowedTypes = UI_CONSTANTS.ALLOWED_FILE_TYPES as readonly string[];
+      if (!allowedTypes.includes(file.type)) {
         errors.push(`${file.name}: File type not allowed`);
         return;
       }
@@ -46,7 +54,6 @@ export function useFileUpload() {
 
     if (errors.length > 0) {
       console.warn("File validation errors:", errors);
-      // In production, show these errors to user via toast/notification
     }
 
     if (validFiles.length > 0) {
@@ -81,9 +88,7 @@ export function useFileUpload() {
     setIsUploading(true);
 
     try {
-      // Upload files one by one (could be parallelized)
       for (const pendingFile of pendingFiles) {
-        // Update status to uploading
         setPendingFiles((prev) =>
           prev.map((f) =>
             f.id === pendingFile.id
@@ -93,7 +98,6 @@ export function useFileUpload() {
         );
 
         try {
-          // Upload with progress tracking
           const uploadedFile = await filesApi.upload(
             pendingFile.file,
             (progress) => {
@@ -105,19 +109,11 @@ export function useFileUpload() {
             },
           );
 
-          // Mark as completed
           setPendingFiles((prev) =>
-            prev.map((f) =>
-              f.id === pendingFile.id
-                ? { ...f, status: "completed", progress: 100 }
-                : f,
-            ),
+            prev.filter((f) => f.id !== pendingFile.id),
           );
-
-          // Add to uploaded files
           setUploadedFiles((prev) => [...prev, uploadedFile]);
         } catch (error) {
-          // Mark as error
           setPendingFiles((prev) =>
             prev.map((f) =>
               f.id === pendingFile.id
@@ -132,40 +128,40 @@ export function useFileUpload() {
           );
         }
       }
-
-      // Remove completed files from pending after a delay
-      setTimeout(() => {
-        setPendingFiles((prev) => prev.filter((f) => f.status !== "completed"));
-      }, 2000);
     } finally {
       setIsUploading(false);
     }
   }, [pendingFiles, isUploading]);
 
   /**
-   * Delete an uploaded file
+   * Clear uploaded files
+   */
+  const clearUploadedFiles = useCallback(() => {
+    setUploadedFiles([]);
+  }, []);
+
+  /**
+   * Delete an uploaded file from server
    */
   const deleteUploadedFile = useCallback(async (fileId: string) => {
     try {
       await filesApi.delete(fileId);
       setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (error) {
-      console.error("Error deleting file:", error);
+      console.error("Failed to delete file:", error);
       throw error;
     }
   }, []);
 
   return {
-    // State
     pendingFiles,
     uploadedFiles,
     isUploading,
-
-    // Actions
     addFiles,
     removePendingFile,
     clearPendingFiles,
     uploadFiles,
+    clearUploadedFiles,
     deleteUploadedFile,
   };
 }

@@ -1,5 +1,5 @@
 /* path: frontend/src/lib/api/files.ts
-   version: 1 */
+   version: 4 - FIXED: Use FILES_UPLOAD endpoint for upload operation */
 
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "../utils/constants";
@@ -48,7 +48,7 @@ export const filesApi = {
    */
   getAll: async (): Promise<UploadedFile[]> => {
     const response = await apiClient.get<{ files: UploadedFile[] }>(
-      API_ENDPOINTS.FILES_LIST,
+      API_ENDPOINTS.FILES,
     );
     return response.files;
   },
@@ -57,6 +57,6 @@ export const filesApi = {
    * Delete a file
    */
   delete: async (fileId: string): Promise<void> => {
-    await apiClient.delete(`${API_ENDPOINTS.FILES_LIST}/${fileId}`);
+    await apiClient.delete(API_ENDPOINTS.FILE_BY_ID(fileId));
   },
 };

@@ -1,57 +1,72 @@
 /* path: frontend/src/types/conversation.ts
-   version: 1 */
+   version: 4 - FIXED: Renamed sharedWith to sharedWithGroupIds for consistency with backend and useConversations */
 
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  conversationId: string;
-}
-
+/**
+ * Conversation metadata
+ */
 export interface Conversation {
   id: string;
   title: string;
+  ownerId: string;
   groupId?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  messageCount: number;
-  ownerId: string; // User who created the conversation
-  sharedWithGroupIds?: string[]; // User groups this conversation is shared with
-  isShared?: boolean; // Helper flag
+  sharedWithGroupIds?: string[];
+  isShared?: boolean;
+  messageCount?: number; // Number of messages in conversation (optional for backward compatibility)
+  createdAt: string;
+  updatedAt: string;
 }
 
+/**
+ * Conversation group (for sidebar organization)
+ */
 export interface ConversationGroup {
   id: string;
   name: string;
-  createdAt: Date;
+  ownerId: string;
   conversationIds: string[];
+  createdAt: string;
 }
 
-// API request/response types
+/**
+ * Message in a conversation
+ */
+export interface Message {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  createdAt: string;
+}
+
+/**
+ * API request types
+ */
 export interface CreateConversationRequest {
   title?: string;
   groupId?: string;
 }
 
-export interface CreateConversationResponse {
-  conversation: Conversation;
-}
-
 export interface UpdateConversationRequest {
   title?: string;
-  groupId?: string;
+  groupId?: string | null;
 }
 
 export interface CreateGroupRequest {
   name: string;
 }
 
-export interface CreateGroupResponse {
-  group: ConversationGroup;
+/**
+ * API response types
+ */
+export interface CreateConversationResponse {
+  conversation: Conversation;
 }
 
-export interface ChatMessageRequest {
-  message: string;
-  conversationId: string;
+/**
+ * FIXED v2: Backend returns {success: true, data: {...}}
+ * Not {group: {...}}
+ */
+export interface CreateGroupResponse {
+  success: boolean;
+  data: ConversationGroup;
 }

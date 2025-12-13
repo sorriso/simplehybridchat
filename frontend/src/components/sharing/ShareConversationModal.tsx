@@ -1,5 +1,5 @@
 /* path: frontend/src/components/sharing/ShareConversationModal.tsx
-   version: 1 */
+   version: 2 - FIXED: Removed isOpen prop and renamed availableGroups to userGroups for compatibility with page.tsx */
 
 import { useState } from "react";
 import { Share2, X } from "lucide-react";
@@ -9,10 +9,9 @@ import type { UserGroup } from "@/types/auth";
 import type { Conversation } from "@/types/conversation";
 
 interface ShareConversationModalProps {
-  isOpen: boolean;
   onClose: () => void;
   conversation: Conversation;
-  availableGroups: UserGroup[];
+  userGroups: UserGroup[];
   onShare: (groupIds: string[]) => Promise<void>;
   onUnshare: (groupIds: string[]) => Promise<void>;
 }
@@ -21,10 +20,9 @@ interface ShareConversationModalProps {
  * Modal to manage conversation sharing with user groups
  */
 export function ShareConversationModal({
-  isOpen,
   onClose,
   conversation,
-  availableGroups,
+  userGroups,
   onShare,
   onUnshare,
 }: ShareConversationModalProps) {
@@ -70,12 +68,7 @@ export function ShareConversationModal({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Share Conversation"
-      size="md"
-    >
+    <Modal isOpen={true} onClose={onClose} title="Share Conversation" size="md">
       <div className="space-y-4">
         {/* Info */}
         <p className="text-sm text-gray-600">
@@ -99,13 +92,13 @@ export function ShareConversationModal({
             User Groups
           </label>
 
-          {availableGroups.length === 0 ? (
+          {userGroups.length === 0 ? (
             <p className="text-sm text-gray-500 italic">
               No user groups available
             </p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {availableGroups.map((group) => (
+              {userGroups.map((group) => (
                 <label
                   key={group.id}
                   className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
@@ -138,7 +131,7 @@ export function ShareConversationModal({
           <Button
             variant="primary"
             onClick={handleSave}
-            disabled={saving || availableGroups.length === 0}
+            disabled={saving || userGroups.length === 0}
             className="flex items-center gap-2"
           >
             <Share2 size={16} />

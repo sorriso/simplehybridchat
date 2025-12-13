@@ -4,8 +4,7 @@
 import { Wrench } from "lucide-react";
 
 /**
- * Full-page maintenance mode screen for non-root users
- * Displayed when server is in maintenance mode
+ * Full-page maintenance mode screen
  */
 export function MaintenancePage() {
   return (

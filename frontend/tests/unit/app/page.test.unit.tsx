@@ -1,5 +1,5 @@
 // path: tests/unit/app/page.test.unit.tsx
-// version: 2
+// version: 3 - REMOVED: Overlay tests (overlay removed from page.tsx v20)
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -56,6 +56,10 @@ jest.mock('@/components/auth/LoginForm', () => ({
   ),
 }));
 
+jest.mock('@/components/sharing/ShareConversationModal', () => ({
+  ShareConversationModal: () => null,
+}));
+
 // Mock hooks
 jest.mock('@/lib/hooks/useAuth');
 jest.mock('@/lib/hooks/useConversations');
@@ -74,6 +78,9 @@ describe('Home Page', () => {
     createGroup: jest.fn(),
     deleteGroup: jest.fn(),
     setCurrentConversationId: jest.fn(),
+    shareConversation: jest.fn(),
+    unshareConversation: jest.fn(),
+    incrementMessageCount: jest.fn(),
     loading: false,
   };
 
@@ -91,6 +98,7 @@ describe('Home Page', () => {
         logout: jest.fn(),
         forceLogout: jest.fn(),
         error: null,
+        authMode: 'local',
       });
 
       const { container } = render(<Home />);
@@ -111,6 +119,7 @@ describe('Home Page', () => {
         logout: jest.fn(),
         forceLogout: jest.fn(),
         error: null,
+        authMode: 'local',
       });
 
       render(<Home />);
@@ -127,6 +136,7 @@ describe('Home Page', () => {
         logout: jest.fn(),
         forceLogout: jest.fn(),
         error: null,
+        authMode: 'local',
       });
 
       render(<Home />);
@@ -144,6 +154,7 @@ describe('Home Page', () => {
         logout: jest.fn(),
         forceLogout: jest.fn(),
         error: 'Invalid credentials',
+        authMode: 'local',
       });
 
       render(<Home />);
@@ -155,12 +166,13 @@ describe('Home Page', () => {
   describe('Authenticated state', () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { id: '1', username: 'testuser', role: 'user', disabled: false },
+        user: { id: '1', email: 'test@example.com', role: 'user', createdAt: '2024-01-01' },
         loading: false,
         login: jest.fn(),
         logout: jest.fn(),
         forceLogout: jest.fn(),
         error: null,
+        authMode: 'local',
       });
     });
 
@@ -185,7 +197,7 @@ describe('Home Page', () => {
 
     it('passes conversations data to Sidebar', () => {
       const conversations = [
-        { id: 'c1', title: 'Chat 1', createdAt: new Date(), userId: '1' },
+        { id: 'c1', title: 'Chat 1', createdAt: new Date().toISOString(), userId: '1', messageCount: 0 },
       ];
       const groups = [
         { id: 'g1', name: 'Group 1', conversationIds: [] },
@@ -206,12 +218,13 @@ describe('Home Page', () => {
   describe('Upload panel', () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { id: '1', username: 'testuser', role: 'user', disabled: false },
+        user: { id: '1', email: 'test@example.com', role: 'user', createdAt: '2024-01-01' },
         loading: false,
         login: jest.fn(),
         logout: jest.fn(),
         forceLogout: jest.fn(),
         error: null,
+        authMode: 'local',
       });
     });
 
@@ -234,38 +247,18 @@ describe('Home Page', () => {
       fireEvent.click(screen.getByText('Close Upload'));
       expect(screen.queryByTestId('upload-panel')).not.toBeInTheDocument();
     });
-
-    it('shows overlay when upload panel is open', () => {
-      const { container } = render(<Home />);
-
-      fireEvent.click(screen.getByText('Upload'));
-
-      const overlay = container.querySelector('.fixed.inset-0.bg-black.bg-opacity-30');
-      expect(overlay).toBeInTheDocument();
-    });
-
-    it('closes upload panel when clicking overlay', () => {
-      const { container } = render(<Home />);
-
-      fireEvent.click(screen.getByText('Upload'));
-      expect(screen.getByTestId('upload-panel')).toBeInTheDocument();
-
-      const overlay = container.querySelector('.fixed.inset-0.bg-black.bg-opacity-30');
-      fireEvent.click(overlay!);
-
-      expect(screen.queryByTestId('upload-panel')).not.toBeInTheDocument();
-    });
   });
 
   describe('Settings panel', () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { id: '1', username: 'testuser', role: 'user', disabled: false },
+        user: { id: '1', email: 'test@example.com', role: 'user', createdAt: '2024-01-01' },
         loading: false,
         login: jest.fn(),
         logout: jest.fn(),
         forceLogout: jest.fn(),
         error: null,
+        authMode: 'local',
       });
     });
 
@@ -288,55 +281,29 @@ describe('Home Page', () => {
       fireEvent.click(screen.getByText('Close Settings'));
       expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
     });
-
-    it('shows overlay when settings panel is open', () => {
-      const { container } = render(<Home />);
-
-      fireEvent.click(screen.getByText('Settings'));
-
-      const overlay = container.querySelector('.fixed.inset-0.bg-black.bg-opacity-30');
-      expect(overlay).toBeInTheDocument();
-    });
-
-    it('closes settings panel when clicking overlay', () => {
-      const { container } = render(<Home />);
-
-      fireEvent.click(screen.getByText('Settings'));
-      expect(screen.getByTestId('settings-panel')).toBeInTheDocument();
-
-      const overlay = container.querySelector('.fixed.inset-0.bg-black.bg-opacity-30');
-      fireEvent.click(overlay!);
-
-      expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
-    });
   });
 
   describe('Both panels', () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { id: '1', username: 'testuser', role: 'user', disabled: false },
+        user: { id: '1', email: 'test@example.com', role: 'user', createdAt: '2024-01-01' },
         loading: false,
         login: jest.fn(),
         logout: jest.fn(),
         forceLogout: jest.fn(),
         error: null,
+        authMode: 'local',
       });
     });
 
-    it('can open both panels and overlay closes both', () => {
-      const { container } = render(<Home />);
+    it('can open both panels', () => {
+      render(<Home />);
 
       fireEvent.click(screen.getByText('Upload'));
       fireEvent.click(screen.getByText('Settings'));
 
       expect(screen.getByTestId('upload-panel')).toBeInTheDocument();
       expect(screen.getByTestId('settings-panel')).toBeInTheDocument();
-
-      const overlay = container.querySelector('.fixed.inset-0.bg-black.bg-opacity-30');
-      fireEvent.click(overlay!);
-
-      expect(screen.queryByTestId('upload-panel')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
     });
   });
 });

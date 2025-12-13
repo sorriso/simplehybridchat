@@ -42,7 +42,10 @@ function loadMessageCountsCache(): MessageCountsCache {
     const cached = localStorage.getItem(MESSAGE_COUNTS_CACHE_KEY);
     return cached ? JSON.parse(cached) : {};
   } catch (error) {
-    console.error("[useConversations] Failed to load message counts cache:", error);
+    console.error(
+      "[useConversations] Failed to load message counts cache:",
+      error,
+    );
     return {};
   }
 }
@@ -54,7 +57,10 @@ function saveMessageCountsCache(cache: MessageCountsCache): void {
   try {
     localStorage.setItem(MESSAGE_COUNTS_CACHE_KEY, JSON.stringify(cache));
   } catch (error) {
-    console.error("[useConversations] Failed to save message counts cache:", error);
+    console.error(
+      "[useConversations] Failed to save message counts cache:",
+      error,
+    );
   }
 }
 
@@ -101,23 +107,24 @@ export function useConversations() {
       setLoading(true);
       setError(null);
 
-     // Load owned conversations, shared conversations, and groups in parallel
-     const [conversationsData, sharedConversationsData, groupsData] = await Promise.all([
-       conversationsApi.getAll(),
-       conversationsApi.getSharedConversations(),
-       groupsApi.getAll(),
-     ]);
+      // Load owned conversations, shared conversations, and groups in parallel
+      const [conversationsData, sharedConversationsData, groupsData] =
+        await Promise.all([
+          conversationsApi.getAll(),
+          conversationsApi.getSharedConversations(),
+          groupsApi.getAll(),
+        ]);
 
-     // Merge owned and shared conversations (shared ones marked with isShared flag)
-     const allConversations = [
-       ...conversationsData,
-       ...sharedConversationsData.map(conv => ({ ...conv, isShared: true }))
-     ];
+      // Merge owned and shared conversations (shared ones marked with isShared flag)
+      const allConversations = [
+        ...conversationsData,
+        ...sharedConversationsData.map((conv) => ({ ...conv, isShared: true })),
+      ];
       // Restore message counts from localStorage cache (temporary display)
       const cache = loadMessageCountsCache();
-      const conversationsWithCounts = allConversations.map(conv => ({
+      const conversationsWithCounts = allConversations.map((conv) => ({
         ...conv,
-        messageCount: cache[conv.id] ?? conv.messageCount ?? 0
+        messageCount: cache[conv.id] ?? conv.messageCount ?? 0,
       }));
 
       setConversations(conversationsWithCounts);
@@ -133,28 +140,31 @@ export function useConversations() {
       ) {
         setCurrentConversationIdState(savedConversationId);
       }
-      
+
       // Recompute real message counts in background (after initial display)
       const countPromises = allConversations.map(async (conv) => {
         try {
           const messages = await conversationsApi.getMessages(conv.id);
           return { id: conv.id, count: messages.length };
         } catch (error) {
-          console.error(`[useConversations] Failed to count messages for ${conv.id}:`, error);
+          console.error(
+            `[useConversations] Failed to count messages for ${conv.id}:`,
+            error,
+          );
           return { id: conv.id, count: cache[conv.id] ?? 0 }; // Fallback to cache
         }
       });
-      
+
       const counts = await Promise.all(countPromises);
-      
+
       // Update state with real counts
-      setConversations(prev =>
-        prev.map(conv => {
-          const realCount = counts.find(c => c.id === conv.id);
+      setConversations((prev) =>
+        prev.map((conv) => {
+          const realCount = counts.find((c) => c.id === conv.id);
           return realCount ? { ...conv, messageCount: realCount.count } : conv;
-        })
+        }),
       );
-      
+
       // Update cache with real counts
       const newCache = { ...cache };
       counts.forEach(({ id, count }) => {
@@ -179,18 +189,18 @@ export function useConversations() {
           title,
           groupId,
         };
-        
+
         const newConversation = await conversationsApi.create(requestData);
-        
+
         // Initialize message count to 0 for new conversation
         const conversationWithCount = { ...newConversation, messageCount: 0 };
         setConversations((prev) => [conversationWithCount, ...prev]);
-        
+
         // Save to cache
         const cache = loadMessageCountsCache();
         cache[newConversation.id] = 0;
         saveMessageCountsCache(cache);
-        
+
         setCurrentConversationIdState(newConversation.id);
         return conversationWithCount;
       } catch (err) {
@@ -234,10 +244,8 @@ export function useConversations() {
         const updated = await conversationsApi.update(id, data);
         // Preserve messageCount from current state when updating
         setConversations((prev) =>
-          prev.map((c) => 
-            c.id === id 
-              ? { ...updated, messageCount: c.messageCount } 
-              : c
+          prev.map((c) =>
+            c.id === id ? { ...updated, messageCount: c.messageCount } : c,
           ),
         );
         return updated;
@@ -290,14 +298,12 @@ export function useConversations() {
     async (conversationId: string, groupId: string) => {
       try {
         await groupsApi.addConversation(groupId, conversationId);
-        
+
         // Optimistic update: preserve message counts
-        setConversations(prev =>
-          prev.map(conv =>
-            conv.id === conversationId
-              ? { ...conv, groupId }
-              : conv
-          )
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId ? { ...conv, groupId } : conv,
+          ),
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to add to group");
@@ -314,14 +320,12 @@ export function useConversations() {
     async (conversationId: string, groupId: string) => {
       try {
         await groupsApi.removeFromGroup(groupId, conversationId);
-        
+
         // Optimistic update: preserve message counts
-        setConversations(prev =>
-          prev.map(conv =>
-            conv.id === conversationId
-              ? { ...conv, groupId: undefined }
-              : conv
-          )
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId ? { ...conv, groupId: undefined } : conv,
+          ),
         );
       } catch (err) {
         setError(
@@ -339,21 +343,21 @@ export function useConversations() {
    * @param conversationId - ID of conversation to update
    */
   const incrementMessageCount = useCallback((conversationId: string) => {
-    setConversations(prev => {
-      const updated = prev.map(conv => 
-        conv.id === conversationId 
-          ? { ...conv, messageCount: (conv.messageCount || 0) + 2 }  // +2 (user + assistant)
-          : conv
+    setConversations((prev) => {
+      const updated = prev.map((conv) =>
+        conv.id === conversationId
+          ? { ...conv, messageCount: (conv.messageCount || 0) + 2 } // +2 (user + assistant)
+          : conv,
       );
-      
+
       // Update cache in localStorage
       const cache = loadMessageCountsCache();
-      const updatedConv = updated.find(c => c.id === conversationId);
+      const updatedConv = updated.find((c) => c.id === conversationId);
       if (updatedConv && updatedConv.messageCount !== undefined) {
         cache[conversationId] = updatedConv.messageCount;
         saveMessageCountsCache(cache);
       }
-      
+
       return updated;
     });
   }, []);
@@ -367,82 +371,94 @@ export function useConversations() {
     try {
       const messages = await conversationsApi.getMessages(conversationId);
       const count = messages.length;
-      
+
       // Update state
-      setConversations(prev =>
-        prev.map(conv =>
-          conv.id === conversationId
-            ? { ...conv, messageCount: count }
-            : conv
-        )
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversationId ? { ...conv, messageCount: count } : conv,
+        ),
       );
-      
+
       // Update cache
       const cache = loadMessageCountsCache();
       cache[conversationId] = count;
       saveMessageCountsCache(cache);
-      
+
       return count;
     } catch (error) {
-      console.error(`[useConversations] Failed to compute message count for ${conversationId}:`, error);
+      console.error(
+        `[useConversations] Failed to compute message count for ${conversationId}:`,
+        error,
+      );
       return 0;
     }
   }, []);
 
+  /**
+   * Share conversation with user groups
+   */
+  const shareConversation = useCallback(
+    async (conversationId: string, groupIds: string[]) => {
+      try {
+        const updated = await conversationsApi.shareConversation(
+          conversationId,
+          groupIds,
+        );
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId
+              ? {
+                  ...conv, // Keep existing fields (especially messageCount)
+                  ...updated, // Apply backend updates
+                  messageCount: conv.messageCount ?? updated.messageCount ?? 0, // Preserve count
+                  isShared: (updated.sharedWithGroupIds?.length ?? 0) > 0,
+                }
+              : conv,
+          ),
+        );
+      } catch (error) {
+        console.error(
+          "[useConversations] Failed to share conversation:",
+          error,
+        );
+        throw error;
+      }
+    },
+    [],
+  );
 
- /**
-  * Share conversation with user groups
-  */
- const shareConversation = useCallback(async (
-   conversationId: string,
-   groupIds: string[]
- ) => {
-   try {
-     const updated = await conversationsApi.shareConversation(conversationId, groupIds);
-     setConversations(prev =>
-       prev.map(conv =>
-         conv.id === conversationId
-           ? { 
-               ...conv,  // Keep existing fields (especially messageCount)
-               ...updated,  // Apply backend updates
-               messageCount: conv.messageCount ?? updated.messageCount ?? 0,  // Preserve count
-               isShared: (updated.sharedWithGroupIds?.length ?? 0) > 0
-             }
-           : conv
-       )
-     );
-   } catch (error) {
-     console.error("[useConversations] Failed to share conversation:", error);
-     throw error;
-   }
- }, []);
-
- /**
-  * Unshare conversation from user groups
-  */
- const unshareConversation = useCallback(async (
-   conversationId: string,
-   groupIds: string[]
- ) => {
-   try {
-     const updated = await conversationsApi.unshareConversation(conversationId, groupIds);
-     setConversations(prev =>
-       prev.map(conv =>
-         conv.id === conversationId
-           ? { 
-               ...conv,  // Keep existing fields (especially messageCount)
-               ...updated,  // Apply backend updates
-               messageCount: conv.messageCount ?? updated.messageCount ?? 0,  // Preserve count
-               isShared: (updated.sharedWithGroupIds?.length ?? 0) > 0
-             }
-           : conv
-       )
-     );
-   } catch (error) {
-     console.error("[useConversations] Failed to unshare conversation:", error);
-     throw error;
-   }
- }, []);
+  /**
+   * Unshare conversation from user groups
+   */
+  const unshareConversation = useCallback(
+    async (conversationId: string, groupIds: string[]) => {
+      try {
+        const updated = await conversationsApi.unshareConversation(
+          conversationId,
+          groupIds,
+        );
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId
+              ? {
+                  ...conv, // Keep existing fields (especially messageCount)
+                  ...updated, // Apply backend updates
+                  messageCount: conv.messageCount ?? updated.messageCount ?? 0, // Preserve count
+                  isShared: (updated.sharedWithGroupIds?.length ?? 0) > 0,
+                }
+              : conv,
+          ),
+        );
+      } catch (error) {
+        console.error(
+          "[useConversations] Failed to unshare conversation:",
+          error,
+        );
+        throw error;
+      }
+    },
+    [],
+  );
 
   return {
     // State

@@ -1,10 +1,9 @@
-// path: tests/unit/components/MaintenanceBanner.test.unit.tsx
-// version: 1
+// path: frontend/tests/unit/components/MaintenanceBanner.test.unit.tsx
+// version: 4 - FIXED: Import React BEFORE mocks that use JSX
 
-import { render, screen, fireEvent } from '@testing-library/react';
-import { MaintenanceBanner } from '@/components/maintenance/MaintenanceBanner';
+import React from 'react';
 
-// Mock Button component
+// Mock dependencies AFTER React import (mocks use JSX)
 jest.mock('@/components/ui/Button', () => ({
   Button: ({ children, onClick, variant, size, className }: any) => (
     <button 
@@ -18,7 +17,6 @@ jest.mock('@/components/ui/Button', () => ({
   ),
 }));
 
-// Mock IconButton component
 jest.mock('@/components/ui/IconButton', () => ({
   IconButton: ({ icon: Icon, onClick, size, title }: any) => (
     <button 
@@ -32,11 +30,13 @@ jest.mock('@/components/ui/IconButton', () => ({
   ),
 }));
 
-// Mock lucide-react icons
 jest.mock('lucide-react', () => ({
   AlertTriangle: () => <svg data-testid="alert-triangle-icon" />,
   X: () => <svg data-testid="x-icon" />,
 }));
+
+import { render, screen, fireEvent } from '@testing-library/react';
+import { MaintenanceBanner } from '@/components/maintenance/MaintenanceBanner';
 
 describe('MaintenanceBanner', () => {
   const mockOnDisable = jest.fn();

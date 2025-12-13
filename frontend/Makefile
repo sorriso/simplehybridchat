@@ -2,21 +2,22 @@
 # Makefile - Frontend Application
 # =============================================================================
 # path: frontend/./Makefile
-# version: 17
+# version: 18
 #
 # Description:
 #   Simple and complete Makefile for Next.js chatbot frontend application.
 #
-# Changes in v17:
-#   - Added automatic cache cleanup in 'make dev' command
-#   - Clears .next, node_modules/.cache, .turbo before starting dev server
+# Changes in v18:
+#   - Added automatic Jest cache cleanup before running tests
+#   - Added clean-test-cache target to clear Jest cache
+#   - test-unit and test-int now auto-clean cache before running
 #
 # Usage:
 #   make help              - Show all available commands
 #   make install-app       - Install application (npm dependencies)
 #   make dev               - Start development server (with cache cleanup)
 #   make build             - Build for production (with lint + format check)
-#   make test              - Run all tests
+#   make test              - Run all tests (with cache cleanup)
 #   make lint              - Run linter
 #   make format            - Auto-format code
 #   make list-files        - List all project files
@@ -45,9 +46,9 @@ help:
 	@echo "  make start           Start production server"
 	@echo ""
 	@echo "TESTS:"
-	@echo "  make test            Run ALL tests (all browsers)"
-	@echo "  make test-unit       Unit tests only"
-	@echo "  make test-int        Integration tests only"
+	@echo "  make test            Run ALL tests (all browsers, with cache cleanup)"
+	@echo "  make test-unit       Unit tests only (with cache cleanup)"
+	@echo "  make test-int        Integration tests only (with cache cleanup)"
 	@echo "  make test-e2e        E2E tests (Chromium + Firefox + Webkit)"
 	@echo "  make test-coverage   Run tests with coverage report"
 	@echo ""
@@ -66,6 +67,7 @@ help:
 	@echo "MAINTENANCE:"
 	@echo "  make clean           Clean build artifacts"
 	@echo "  make clean-cache     Clean Next.js cache only"
+	@echo "  make clean-test-cache Clean Jest test cache only"
 	@echo "  make reset           HARD RESET everything"
 	@echo "  make list-files      List all project files (exclude build dirs)"
 	@echo ""
@@ -145,16 +147,22 @@ start:
 # =============================================================================
 
 .PHONY: test
-test: test-unit test-int
+test: clean-test-cache test-unit test-int
 
 .PHONY: test-unit
-test-unit:
-	@echo "Unit tests..."
+test-unit: clean-test-cache
+	@echo "==================================================="
+	@echo "  Running Unit Tests"
+	@echo "==================================================="
+	@echo ""
 	npx jest tests/unit
 
 .PHONY: test-int
-test-int:
-	@echo "Integration tests..."
+test-int: clean-test-cache
+	@echo "==================================================="
+	@echo "  Running Integration Tests"
+	@echo "==================================================="
+	@echo ""
 	npx jest tests/integration
 
 .PHONY: test-e2e
@@ -178,7 +186,7 @@ test-e2e-webkit:
 	npx playwright test --project=webkit
 
 .PHONY: test-coverage
-test-coverage:
+test-coverage: clean-test-cache
 	@echo "==================================================="
 	@echo "  Running tests with coverage"
 	@echo "==================================================="
@@ -246,6 +254,14 @@ clean-cache:
 	@rm -rf .turbo 2>/dev/null || true
 	@echo "✓ Cache cleaned (.next, node_modules/.cache, .turbo)"
 
+.PHONY: clean-test-cache
+clean-test-cache:
+	@echo "Cleaning Jest test cache..."
+	@rm -rf node_modules/.cache/jest 2>/dev/null || true
+	@rm -rf .jest-cache 2>/dev/null || true
+	@npx jest --clearCache 2>/dev/null || true
+	@echo "✓ Jest cache cleared"
+
 .PHONY: reset
 reset:
 	@echo "==================================================="
@@ -279,12 +295,13 @@ list-files:
 #
 # DAILY DEV:
 #   make dev              (start coding - cache auto-cleaned)
-#   make test-unit        (quick tests)
+#   make test-unit        (quick tests - cache auto-cleaned)
 #
 # BEFORE COMMIT:
 #   make build            (verify build)
-#   make test             (all tests)
+#   make test             (all tests - cache auto-cleaned)
 #
 # IF BROKEN:
+#   make clean-test-cache (clear Jest cache)
 #   make reset            (fix 90% of issues)
 #

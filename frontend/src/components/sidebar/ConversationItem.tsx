@@ -8,7 +8,13 @@
    - Reason: Support shared conversations display with proper restrictions
 */
 
-import { MessageSquare, Trash2, Edit2, GripVertical, Share2 } from "lucide-react";
+import {
+  MessageSquare,
+  Trash2,
+  Edit2,
+  GripVertical,
+  Share2,
+} from "lucide-react";
 import { Conversation } from "@/types/conversation";
 import { ContextMenu } from "../ui/ContextMenu";
 import clsx from "clsx";

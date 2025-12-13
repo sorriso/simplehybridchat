@@ -1,24 +1,26 @@
-// path: tests/unit/components/ChatContainer.test.unit.tsx
-// version: 1
+// path: frontend/tests/unit/components/ChatContainer.test.unit.tsx
+// version: 4 - FIXED: Import React before mocks, proper mock structure
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { ChatContainer } from '@/components/chat/ChatContainer';
-import { useSettings } from '@/lib/hooks/useSettings';
 
-// Mock ChatInterface
+// Mock ChatInterface AFTER React import
 jest.mock('@/components/chat/ChatInterface', () => ({
-  ChatInterface: ({ conversationId, promptCustomization }: any) => (
+  ChatInterface: ({ conversationId, promptCustomization, onMessageSent }: any) => (
     <div data-testid="chat-interface">
-      <div data-testid="conversation-id">{conversationId || 'null'}</div>
-      <div data-testid="prompt-customization">{promptCustomization || 'none'}</div>
+      <div data-testid="conversation-id">{conversationId ?? 'null'}</div>
+      <div data-testid="prompt-customization">{promptCustomization ?? 'none'}</div>
+      {onMessageSent && <button onClick={onMessageSent} data-testid="send-button">Send</button>}
     </div>
   ),
 }));
 
 // Mock useSettings hook
 jest.mock('@/lib/hooks/useSettings');
+
+import { ChatContainer } from '@/components/chat/ChatContainer';
+import { useSettings } from '@/lib/hooks/useSettings';
 
 describe('ChatContainer', () => {
   const mockUseSettings = useSettings as jest.MockedFunction<typeof useSettings>;
@@ -107,16 +109,24 @@ describe('ChatContainer', () => {
     expect(screen.getByTestId('conversation-id')).toHaveTextContent('conv-2');
   });
 
-  it('renders container with correct structure', () => {
+  it('passes onMessageSent callback to ChatInterface', () => {
     mockUseSettings.mockReturnValue({
       settings: null,
       updateSettings: jest.fn(),
       loading: false,
     });
 
-    const { container } = render(<ChatContainer currentConversationId="conv-123" />);
+    const mockOnMessageSent = jest.fn();
+    render(
+      <ChatContainer 
+        currentConversationId="conv-123" 
+        onMessageSent={mockOnMessageSent}
+      />
+    );
 
-    const wrapper = container.firstChild;
-    expect(wrapper).toHaveClass('h-full', 'flex', 'flex-col');
+    const sendButton = screen.getByTestId('send-button');
+    sendButton.click();
+
+    expect(mockOnMessageSent).toHaveBeenCalledTimes(1);
   });
 });

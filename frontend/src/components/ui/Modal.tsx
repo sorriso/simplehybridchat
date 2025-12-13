@@ -1,5 +1,5 @@
 /* path: frontend/src/components/ui/Modal.tsx
-   version: 2 */
+   version: 3 - FIXED: Backdrop opacity using inline style instead of Tailwind class */
 
 import { ReactNode, useEffect, useId } from "react";
 import { X } from "lucide-react";
@@ -16,6 +16,9 @@ interface ModalProps {
 /**
  * Modal component with overlay
  * Implements WAI-ARIA dialog pattern for accessibility
+ *
+ * FIXED v3: Using inline style for backdrop opacity because Tailwind
+ * bg-opacity classes may not compile properly in some setups
  */
 export function Modal({
   isOpen,
@@ -63,9 +66,10 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Overlay */}
+      {/* Overlay - FIXED: Using inline style for opacity */}
       <div
-        className="absolute inset-0 bg-black bg-opacity-50"
+        className="absolute inset-0"
+        style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
         data-overlay="true"
         onClick={onClose}
         aria-hidden="true"
@@ -77,10 +81,10 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         className={`
-          relative bg-white rounded-lg shadow-xl
-          w-full mx-4 ${sizeClasses[size]}
-          max-h-[90vh] overflow-y-auto
-        `}
+             relative bg-white rounded-lg shadow-xl
+             w-full mx-4 ${sizeClasses[size]}
+             max-h-[90vh] overflow-y-auto
+           `}
       >
         {/* Header */}
         {title && (

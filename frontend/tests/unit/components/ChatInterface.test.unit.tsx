@@ -1,4 +1,4 @@
-// path: tests/unit/components/ChatInterface.test.unit.tsx
+// path: frontend/tests/unit/components/ChatInterface.test.unit.tsx
 // version: 2
 
 import React from 'react';
@@ -50,8 +50,7 @@ describe('ChatInterface', () => {
     it('shows empty state when no conversation is selected', () => {
       render(<ChatInterface conversationId={null} />);
 
-      expect(screen.getByText('No conversation selected')).toBeInTheDocument();
-      expect(screen.getByText('Create or select a conversation to start chatting')).toBeInTheDocument();
+      expect(screen.getByText('Select or create a conversation to start chatting')).toBeInTheDocument();
     });
 
     it('does not load history when conversationId is null', () => {
@@ -149,7 +148,7 @@ describe('ChatInterface', () => {
       rerender(<ChatInterface conversationId={null} />);
 
       expect(screen.queryByTestId('ai-chat')).not.toBeInTheDocument();
-      expect(screen.getByText('No conversation selected')).toBeInTheDocument();
+      expect(screen.getByText('Select or create a conversation to start chatting')).toBeInTheDocument();
     });
   });
 

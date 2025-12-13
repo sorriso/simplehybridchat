@@ -1,5 +1,6 @@
 /* path: frontend/src/components/chat/ChatInterface.tsx
-   version: 5 - Load conversation history on mount */
+   version: 12 - ENHANCED: Blue pastel background for visual unity with selected conversation
+                Now adapter recreates when switching conversations */
 
 "use client";
 
@@ -8,13 +9,48 @@ import { AiChat } from "@nlux/react";
 import { useAsStreamAdapter } from "@nlux/react";
 import type { ChatItem } from "@nlux/react";
 import "@nlux/themes/nova.css";
-import { API_ENDPOINTS } from "@/lib/utils/constants";
-import { MOCK_USER } from "@/lib/utils/constants";
+import { API_ENDPOINTS, STORAGE_KEYS } from "@/lib/utils/constants";
 import { conversationsApi } from "@/lib/api/conversations";
 
 interface ChatInterfaceProps {
   conversationId: string | null;
   promptCustomization?: string;
+  onMessageSent?: () => void; // Called after message fully sent
+}
+
+/**
+ * Get API base URL
+ */
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+/**
+ * Get authentication token from localStorage
+ */
+function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    return window.localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  } catch (error) {
+    console.error("Error reading auth token:", error);
+    return null;
+  }
+}
+
+/**
+ * Get current user from localStorage
+ */
+function getCurrentUser(): { name: string; email: string } | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const userStr = window.localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (!userStr) return null;
+    return JSON.parse(userStr);
+  } catch (error) {
+    console.error("Error reading current user:", error);
+    return null;
+  }
 }
 
 /**
@@ -23,6 +59,7 @@ interface ChatInterfaceProps {
 export function ChatInterface({
   conversationId,
   promptCustomization,
+  onMessageSent,
 }: ChatInterfaceProps) {
   console.log("[ChatInterface] Rendering with conversationId:", conversationId);
 
@@ -76,18 +113,29 @@ export function ChatInterface({
       }
 
       try {
-        const response = await fetch(API_ENDPOINTS.CHAT_STREAM, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${MOCK_USER.token}`,
+        // Get real token from localStorage
+        const token = getAuthToken();
+        if (!token) {
+          observer.error(new Error("Not authenticated"));
+          return;
+        }
+
+        // CRITICAL: Use API_BASE_URL for backend
+        const response = await fetch(
+          `${API_BASE_URL}${API_ENDPOINTS.CHAT_STREAM}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              message,
+              conversationId,
+              promptCustomization: promptCustomization || "",
+            }),
           },
-          body: JSON.stringify({
-            message,
-            conversationId,
-            promptCustomization: promptCustomization || "",
-          }),
-        });
+        );
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -101,65 +149,91 @@ export function ChatInterface({
           throw new Error("No response body");
         }
 
+        let buffer = "";
+
         while (true) {
           const { done, value } = await reader.read();
 
           if (done) {
+            console.log("[ChatInterface] Stream complete");
             observer.complete();
+            onMessageSent?.(); // Notify parent that message was sent
             break;
           }
 
-          // Decode and send chunks to NLUX
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          // Decode chunk
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete lines
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.substring(6).trim();
-              if (data && data !== "[DONE]") {
-                observer.next(data);
-              }
+            if (!line.trim() || !line.startsWith("data: ")) {
+              continue;
+            }
+
+            const data = line.slice(6); // Remove "data: " prefix but KEEP whitespace!
+            const dataTrimmed = data.trim(); // Trimmed version for control signals
+
+            // Check for completion signal
+            if (dataTrimmed === "[DONE]") {
+              console.log("[ChatInterface] Received [DONE]");
+              observer.complete();
+              onMessageSent?.(); // Notify parent that message was sent
+              return;
+            }
+
+            // Check for error signal
+            if (dataTrimmed.startsWith("[ERROR:")) {
+              const errorMsg = dataTrimmed.substring(7, dataTrimmed.length - 1); // Remove [ERROR: and ]
+              console.error("[ChatInterface] Received error:", errorMsg);
+              observer.error(new Error(errorMsg));
+              return;
+            }
+
+            // FIXED v9: Preserve whitespace in chunks (don't trim!)
+            // Backend sends tokens like " hello" with leading space
+            if (data) {
+              observer.next(data);
             }
           }
         }
       } catch (error) {
-        console.error("Chat stream error:", error);
-        observer.error(
-          error instanceof Error ? error : new Error("Unknown error"),
-        );
+        console.error("[ChatInterface] Stream error:", error);
+        observer.error(error as Error);
       }
     },
-    [conversationId, promptCustomization],
+    [conversationId, promptCustomization, onMessageSent],
   );
 
-  // Show empty state when no conversation is selected
   if (!conversationId) {
     console.log("[ChatInterface] No conversationId - showing empty state");
     return (
-      <div className="flex items-center justify-center h-full text-gray-500">
+      <div className="flex h-full items-center justify-center text-gray-500">
+        <p>Select or create a conversation to start chatting</p>
+      </div>
+    );
+  }
+
+  // Show loading state while history is loading
+  if (loadingHistory) {
+    return (
+      <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium mb-2">No conversation selected</p>
-          <p className="text-sm">
-            Create or select a conversation to start chatting
-          </p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Loading conversation...</p>
         </div>
       </div>
     );
   }
 
-  console.log("[ChatInterface] Rendering AiChat component");
-
-  // Show loading state while fetching history
-  if (loadingHistory) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-      </div>
-    );
-  }
+  // Get current user for persona
+  const currentUser = getCurrentUser();
+  const userName = currentUser?.name || "User";
 
   return (
-    <div className="h-full">
+    <div className="h-full bg-blue-50">
       <AiChat
         key={conversationId}
         adapter={adapter}
@@ -172,8 +246,8 @@ export function ChatInterface({
               "https://ui-avatars.com/api/?name=AI+Assistant&background=3b82f6&color=fff",
           },
           user: {
-            name: MOCK_USER.name,
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(MOCK_USER.name)}&background=10b981&color=fff`,
+            name: userName,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=10b981&color=fff`,
           },
         }}
         conversationOptions={{
