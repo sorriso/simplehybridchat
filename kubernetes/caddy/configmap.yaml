@@ -1,6 +1,8 @@
 # path: k8s/caddy/configmap.yaml
-# version: 1.0
+# version: 1.1
 # Caddy reverse proxy configuration
+# Changes in v1.1:
+# - FIXED: Changed frontend port from 80 to 3000 (Next.js standalone uses 3000)
 
 apiVersion: v1
 kind: ConfigMap
@@ -28,7 +30,7 @@ data:
 
         # Route everything else to frontend
         handle {
-            reverse_proxy frontend:80
+            reverse_proxy frontend:3000
         }
 
         # Error handling
