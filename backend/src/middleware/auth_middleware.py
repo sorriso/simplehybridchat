@@ -1,6 +1,12 @@
 """
 Path: backend/src/middleware/auth_middleware.py
-Version: 8.0
+Version: 9.0
+
+Changes in v9.0:
+- CRITICAL FIX: Load group_ids from database in local auth mode
+- After decoding JWT token, fetch full user from DB to get group_ids
+- Without group_ids, shared conversation access fails with 403
+- Now matches SSO behavior (both modes load full user with group_ids)
 
 Changes in v8.0:
 - CRITICAL FIX: Add CORS headers to all 401 error responses
@@ -53,18 +59,12 @@ def get_cors_headers() -> Dict[str, str]:
     Get CORS headers for error responses
     
     Returns:
-        Dict of CORS headers
+        Dict with CORS headers
     """
     origins = settings.get_cors_origins()
-    # For simplicity, allow all configured origins
-    # In production, you might want to check the actual Origin header
-    origin = origins[0] if origins else "*"
-    
     return {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Credentials": "true",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin",
+        "Access-Control-Allow-Origin": origins[0] if origins else "*",
+        "Access-Control-Allow-Credentials": "true"
     }
 
 
@@ -126,7 +126,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             Response from handler
         """
         # ====================================================================
-        # CRITICAL FIX v7.0: Allow OPTIONS requests (CORS preflight) to pass
+        # Allow OPTIONS requests (CORS preflight) without authentication
         # ====================================================================
         if request.method == "OPTIONS":
             logger.debug(f"OPTIONS request to {request.url.path} - bypassing auth")
@@ -193,10 +193,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         """
         # Extract SSO headers
         token = request.headers.get(settings.SSO_TOKEN_HEADER)
-        name = request.headers.get(settings.SSO_NAME_HEADER)
         email = request.headers.get(settings.SSO_EMAIL_HEADER)
+        name = request.headers.get(settings.SSO_NAME_HEADER)
         
-        # Validate required headers
         if not all([token, email]):
             logger.warning(f"Missing SSO headers: token={bool(token)}, email={bool(email)}")
             return JSONResponse(
@@ -264,9 +263,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 content={
                     "success": False,
                     "error": "SSO authentication failed",
-                    "code": "INTERNAL_ERROR"
+                    "code": "UNAUTHORIZED"
                 },
-                status_code=500,
+                status_code=401,
                 headers=get_cors_headers()  # v8.0: Add CORS headers
             )
     
@@ -279,6 +278,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Handle local JWT authentication
         
         Validates Bearer token and extracts user.
+        v9.0: Loads full user from DB to get group_ids.
         
         Args:
             request: Incoming request
@@ -334,11 +334,44 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                     headers=get_cors_headers()  # v8.0: Add CORS headers
                 )
             
-            # Inject user into request scope
-            request.scope["user"] = {
-                "id": user_id,
-                "role": payload.get("role", "user")
-            }
+            # v9.0: Load full user from database to get group_ids
+            try:
+                db = get_database()
+                db_user = db.get_by_id("users", user_id)
+                
+                if not db_user:
+                    logger.warning(f"User {user_id} from token not found in DB")
+                    return JSONResponse(
+                        content={
+                            "success": False,
+                            "error": "User not found",
+                            "code": "UNAUTHORIZED"
+                        },
+                        status_code=401,
+                        headers=get_cors_headers()  # v8.0: Add CORS headers
+                    )
+                
+                # Inject full user with group_ids
+                request.scope["user"] = {
+                    "id": db_user.get("id"),
+                    "name": db_user.get("name"),
+                    "email": db_user.get("email"),
+                    "role": db_user.get("role", "user"),
+                    "status": db_user.get("status", "active"),
+                    "group_ids": db_user.get("group_ids", [])
+                }
+                
+                logger.debug(f"Authenticated user: {user_id} with groups: {db_user.get('group_ids', [])}")
+                
+            except Exception as db_error:
+                logger.error(f"Failed to load user from DB: {db_error}")
+                # Fallback to token payload only (no group_ids)
+                request.scope["user"] = {
+                    "id": user_id,
+                    "role": payload.get("role", "user"),
+                    "group_ids": []
+                }
+                logger.warning(f"Fallback: User {user_id} loaded without group_ids")
             
             logger.debug(f"Authenticated user: {user_id}")
             

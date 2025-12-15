@@ -1,18 +1,18 @@
 """
 Path: backend/src/services/user_group_service.py
-Version: 4
+Version: 6
 
-Changes in v4:
-- FIX: Corrected check_permission calls - function takes 2 args only (user, required_role)
-- FIX: Added delete_group() method that was missing
-- Changed all check_permission(user, role, message) to check_permission(user, role) + HTTPException
-- All permission checks now use proper pattern: if not check_permission(...): raise HTTPException
+Changes in v6:
+- FIX: list_groups now allows users to see their own groups (groups where they are members)
+- Users no longer get 403 when calling GET /api/user-groups
+- Returns only active groups for regular users
+- Enables conversation sharing for all users
 
-Changes in v3:
-- FIX: Replaced self.user_repo.get() with self.user_repo.get_by_id() (2 occurrences)
-
-Changes in v2:
-- FIX: Replaced self.group_repo.get() with self.group_repo.get_by_id()
+Changes in v5:
+- FIX: add_member now updates BOTH group AND user (bidirectional)
+- FIX: remove_member now updates BOTH group AND user (bidirectional)
+- Updates group.member_ids AND user.group_ids
+- Ensures frontend receives correct groupIds for users
 
 Service for user groups (user management, not conversation groups)
 Handles business logic and permissions for user group operations
@@ -57,30 +57,44 @@ class UserGroupService:
         
         Root: sees all groups
         Manager: sees only groups they manage
-        User: forbidden
+        User: sees only groups they are member of
         
         Args:
             current_user: Current user dict
             
         Returns:
             List of groups (never None)
-            
-        Raises:
-            HTTPException 403: If user lacks manager permission
         """
-        # Require at least manager role
-        if not check_permission(current_user, "manager"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Manager or root permission required"
-            )
-        
         # Root sees all groups
         if check_permission(current_user, "root"):
             return self.group_repo.get_all() or []
         
         # Manager sees only their managed groups
-        return self.group_repo.get_by_manager(current_user["id"]) or []
+        if check_permission(current_user, "manager"):
+            return self.group_repo.get_by_manager(current_user["id"]) or []
+        
+        # User sees only groups they are member of
+        user_id = current_user["id"]
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return []
+        
+        # Get groups where user is member
+        group_ids = user.get("group_ids", [])
+        if not group_ids:
+            return []
+        
+        groups = []
+        for group_id in group_ids:
+            try:
+                group = self.group_repo.get_by_id(group_id)
+                if group and group.get("status") == "active":
+                    groups.append(group)
+            except:
+                # Skip invalid group IDs
+                continue
+        
+        return groups
     
     def get_group(
         self,
@@ -292,6 +306,10 @@ class UserGroupService:
         """
         Add user to group
         
+        BIDIRECTIONAL UPDATE:
+        - Updates group: adds user_id to member_ids
+        - Updates user: adds group_id to group_ids
+        
         Args:
             group_id: Group ID
             user_id: User ID to add
@@ -314,7 +332,16 @@ class UserGroupService:
                 detail="User not found"
             )
         
-        return self.group_repo.add_member(group_id, user_id)
+        # Update group: add user to member_ids
+        updated_group = self.group_repo.add_member(group_id, user_id)
+        
+        # Update user: add group to group_ids (bidirectional)
+        current_group_ids = user.get("group_ids", [])
+        if group_id not in current_group_ids:
+            current_group_ids.append(group_id)
+            self.user_repo.update(user_id, {"group_ids": current_group_ids})
+        
+        return updated_group
     
     def remove_member(
         self,
@@ -324,6 +351,10 @@ class UserGroupService:
     ) -> Dict[str, Any]:
         """
         Remove user from group
+        
+        BIDIRECTIONAL UPDATE:
+        - Updates group: removes user_id from member_ids
+        - Updates user: removes group_id from group_ids
         
         Args:
             group_id: Group ID
@@ -338,7 +369,19 @@ class UserGroupService:
             HTTPException 403: If user cannot manage group
         """
         group = self.get_group(group_id, current_user)
-        return self.group_repo.remove_member(group_id, user_id)
+        
+        # Update group: remove user from member_ids
+        updated_group = self.group_repo.remove_member(group_id, user_id)
+        
+        # Update user: remove group from group_ids (bidirectional)
+        user = self.user_repo.get_by_id(user_id)
+        if user:
+            current_group_ids = user.get("group_ids", [])
+            if group_id in current_group_ids:
+                current_group_ids.remove(group_id)
+                self.user_repo.update(user_id, {"group_ids": current_group_ids})
+        
+        return updated_group
     
     # ========================================================================
     # Manager Management

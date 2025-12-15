@@ -1,11 +1,17 @@
 """
 Path: backend/src/services/message_service.py
-Version: 1
+Version: 2
+
+Changes in v2:
+- ADDED: Debug logging for access checks
+- Shows user_id, owner_id, user_groups, shared_groups
+- Helps diagnose 403 Forbidden issues
 
 Message management service
 Handles message operations for conversations
 """
 
+import logging
 from typing import List, Optional, Dict, Any
 from fastapi import HTTPException, status
 
@@ -13,6 +19,8 @@ from src.models.message import MessageCreate, MessageResponse
 from src.repositories.message_repository import MessageRepository
 from src.repositories.conversation_repository import ConversationRepository
 from src.database.interface import IDatabase
+
+logger = logging.getLogger(__name__)
 
 
 class MessageService:
@@ -54,18 +62,31 @@ class MessageService:
                 detail="Conversation not found"
             )
         
-        # Check access
-        is_owner = conversation.get("owner_id") == current_user["id"]
+        # DEBUG: Log access check details
+        user_id = current_user["id"]
+        owner_id = conversation.get("owner_id")
         user_groups = current_user.get("group_ids", [])
         shared_groups = conversation.get("shared_with_group_ids", [])
+        
+        logger.debug(f"[ACCESS CHECK] conversation_id={conversation_id}")
+        logger.debug(f"[ACCESS CHECK] user_id={user_id}, owner_id={owner_id}")
+        logger.debug(f"[ACCESS CHECK] user_groups={user_groups}")
+        logger.debug(f"[ACCESS CHECK] shared_groups={shared_groups}")
+        
+        # Check access
+        is_owner = owner_id == user_id
         has_shared_access = any(gid in shared_groups for gid in user_groups)
         
+        logger.debug(f"[ACCESS CHECK] is_owner={is_owner}, has_shared_access={has_shared_access}")
+        
         if not (is_owner or has_shared_access):
+            logger.warning(f"[ACCESS DENIED] user {user_id} cannot access conversation {conversation_id}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied to this conversation"
             )
         
+        logger.debug(f"[ACCESS GRANTED] user {user_id} can access conversation {conversation_id}")
         return conversation
     
     def get_conversation_messages(

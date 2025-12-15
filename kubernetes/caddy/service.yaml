@@ -1,0 +1,18 @@
+# path: k8s/caddy/service.yaml
+# version: 1.0
+# Caddy reverse proxy service
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy
+  namespace: chatbot
+spec:
+  type: ClusterIP
+  selector:
+    app: caddy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

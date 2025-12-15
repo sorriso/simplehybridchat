@@ -1,0 +1,38 @@
+# path: k8s/caddy/configmap.yaml
+# version: 1.0
+# Caddy reverse proxy configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-config
+  namespace: chatbot
+data:
+  Caddyfile: |
+    :80 {
+        # Enable access logging
+        log {
+            output stdout
+            format console
+        }
+
+        # Health check endpoint
+        handle /health {
+            respond "OK" 200
+        }
+
+        # Route API requests to backend
+        handle /api/* {
+            reverse_proxy backend:8000
+        }
+
+        # Route everything else to frontend
+        handle {
+            reverse_proxy frontend:80
+        }
+
+        # Error handling
+        handle_errors {
+            respond "{err.status_code} {err.status_text}"
+        }
+    }

@@ -1,0 +1,11 @@
+# path: k8s/namespace.yaml
+# version: 1.0
+# Chatbot namespace definition
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chatbot
+  labels:
+    name: chatbot
+    environment: production

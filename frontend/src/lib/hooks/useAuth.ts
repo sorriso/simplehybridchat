@@ -1,5 +1,10 @@
 /* path: frontend/src/lib/hooks/useAuth.ts
-   version: 6
+   version: 7
+   
+   Changes in v7:
+   - FIX: updateGroup uses response.data (backend returns SingleUserGroupResponse with data field)
+   - ADDED: createUser function for creating new users (was missing)
+   - Reason: updateGroup was using response.group causing rename to fail
    
    Changes in v6:
    - FIX: Reverted getAllUsers and toggleUserStatus to use correct response fields
@@ -146,6 +151,22 @@ export const userManagementApi = {
   },
 
   /**
+   * Create new user (root only)
+   */
+  createUser: async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    role?: "user" | "manager" | "root";
+  }): Promise<User> => {
+    const response = await apiClient.post<{ user: User }>(
+      "/api/users",
+      userData,
+    );
+    return response.user;
+  },
+
+  /**
    * Activate/deactivate user (manager for their groups, root for all)
    */
   toggleUserStatus: async (
@@ -198,11 +219,11 @@ export const userManagementApi = {
    * Update user group
    */
   updateGroup: async (groupId: string, name: string): Promise<UserGroup> => {
-    const response = await apiClient.put<{ group: UserGroup }>(
+    const response = await apiClient.put<{ data: UserGroup }>(
       `/api/user-groups/${groupId}`,
       { name },
     );
-    return response.group;
+    return response.data;
   },
 
   /**

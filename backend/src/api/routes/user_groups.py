@@ -1,11 +1,17 @@
 """
 Path: backend/src/api/routes/user_groups.py
-Version: 3
+Version: 5
 
-Changes in v3:
-- FIX: Response wrappers use 'data' instead of 'group/groups'
-- Reason: SuccessResponse base class requires 'data' field
-- Pattern matches groups.py and other working routes
+Changes in v5:
+- UPDATED: Documentation for list_user_groups endpoint
+- Users can now see groups they are member of (not just managers/root)
+- Enables conversation sharing for all users
+
+Changes in v4:
+- FIX: create_group passes {"name": data.name} dict instead of data.name string
+- FIX: update_group passes {"name": data.name} dict instead of data.name string
+- Reason: Service v4 expects dict parameter, not string
+- Matches TypeError fix in stack trace (line 106)
 
 Changes in v2:
 - Full implementation with service and repository
@@ -54,6 +60,7 @@ async def list_user_groups(
     """
     Get all user groups based on permissions
     
+    - User: sees only groups they are member of
     - Manager: sees only groups they manage
     - Root: sees all groups
     """
@@ -103,7 +110,7 @@ async def create_user_group(
     Groups start with no members or managers.
     """
     service = UserGroupService(db=db)
-    group = service.create_group(data.name, current_user)
+    group = service.create_group({"name": data.name}, current_user)
     
     return SingleUserGroupResponse(data=UserGroupResponse(**group))
 
@@ -123,7 +130,7 @@ async def update_user_group(
     Update user group name (root only)
     """
     service = UserGroupService(db=db)
-    group = service.update_group(group_id, data.name, current_user)
+    group = service.update_group(group_id, {"name": data.name}, current_user)
     
     return SingleUserGroupResponse(data=UserGroupResponse(**group))
 

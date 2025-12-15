@@ -1,23 +1,16 @@
 /* path: frontend/src/lib/hooks/useConversations.ts
-   version: 19
+   version: 20
+   
+   Changes in v20:
+   - CRITICAL FIX: Added user parameter to hook
+   - loadData() triggered when user changes (login/logout)
+   - Clears conversations/groups on logout (user=null)
+   - Fixes stale data after logout/login with different user
    
    Changes in v19:
    - FIXED: Removed duplicate keys in return statement (incrementMessageCount, computeMessageCount)
    - FIXED: Removed console.log statements (ESLint no-console rule)
    - Kept only console.error for actual error logging
-   
-   Changes in v18:
-   - CRITICAL FIX: Preserve messageCount when sharing/unsharing conversations
-   - FIXED: shareConversation() now keeps existing messageCount
-   - FIXED: unshareConversation() now keeps existing messageCount
-   - Reason: Backend doesn't return messageCount, was being reset to 0
-   
-   Changes in v17:
-   - ADDED: Load shared conversations in loadData()
-   - ADDED: Merge owned + shared conversations
-   - ADDED: shareConversation() method
-   - ADDED: unshareConversation() method
-   - Reason: Support viewing and managing shared conversations
 */
 
 import { useState, useEffect, useCallback } from "react";
@@ -25,6 +18,7 @@ import { conversationsApi, groupsApi } from "../api/conversations";
 import type { Conversation, ConversationGroup } from "@/types/conversation";
 import { storage } from "../utils/storage";
 import { STORAGE_KEYS } from "../utils/constants";
+import type { User } from "@/types/auth";
 
 // Cache key for message counts in localStorage
 const MESSAGE_COUNTS_CACHE_KEY = "message_counts_cache";
@@ -64,10 +58,14 @@ function saveMessageCountsCache(cache: MessageCountsCache): void {
   }
 }
 
+interface UseConversationsParams {
+  user: User | null;
+}
+
 /**
  * Hook for managing conversations and groups
  */
-export function useConversations() {
+export function useConversations({ user }: UseConversationsParams) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groups, setGroups] = useState<ConversationGroup[]>([]);
   const [currentConversationId, setCurrentConversationIdState] = useState<
@@ -81,16 +79,20 @@ export function useConversations() {
     setCurrentConversationIdState(id);
   }, []);
 
-  // Load conversations and groups on mount - but only if authenticated
+  // Load conversations and groups when user changes
   useEffect(() => {
-    // Check if auth token exists before loading
-    const token = storage.getAuthToken();
-    if (token) {
+    if (user) {
+      // User logged in - load their data
       loadData();
     } else {
+      // User logged out - clear data
+      setConversations([]);
+      setGroups([]);
+      setCurrentConversationIdState(null);
       setLoading(false);
+      setError(null);
     }
-  }, []);
+  }, [user?.id]); // React to user ID changes
 
   // Persist current conversation ID
   useEffect(() => {

@@ -1,10 +1,12 @@
 """
 Path: backend/src/repositories/settings_repository.py
-Version: 2
+Version: 3
 
-Changes in v2:
-- CRITICAL FIX: Changed collection name from "user_settings" to "settings"
-- This matches the collection created in main.py bootstrap
+Changes in v3:
+- CRITICAL FIX: get_by_user() now searches by user_id filter (not _key)
+- upsert() now correctly finds existing settings by user_id before update
+- Fixes 409 Duplicate key error when settings already exist
+- Previous v2 searched by _key=user_id, but _key is auto-generated
 
 Repository for user settings persistence in ArangoDB
 """
@@ -24,7 +26,7 @@ class SettingsRepository(BaseRepository):
     - theme (light/dark)
     - language (en/fr/es/de)
     
-    Uses user_id as _key for 1:1 relationship with users
+    Each user has one settings document linked by user_id field
     """
     
     def __init__(self, db=None):
@@ -37,13 +39,13 @@ class SettingsRepository(BaseRepository):
         from src.database.factory import get_database
         if db is None:
             db = get_database()
-        super().__init__(db=db, collection="settings")  # FIXED v2: was "user_settings"
+        super().__init__(db=db, collection="settings")
     
     def get_by_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Get settings for a user
         
-        Uses user_id as _key for direct lookup.
+        Searches by user_id field (not _key).
         
         Args:
             user_id: User ID
@@ -51,13 +53,19 @@ class SettingsRepository(BaseRepository):
         Returns:
             Settings document or None if not found
         """
-        return super().get_by_id(user_id)
+        settings_list = self.db.get_all(
+            self.collection,
+            filters={"user_id": user_id},
+            limit=1
+        )
+        
+        return settings_list[0] if settings_list else None
     
     def upsert(self, user_id: str, settings_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create or update user settings
         
-        Uses user_id as _key. If settings exist, updates them.
+        If settings exist for user_id, updates them.
         If not, creates new settings document.
         
         Args:
@@ -67,24 +75,26 @@ class SettingsRepository(BaseRepository):
         Returns:
             Updated settings document with id
         """
-        # Check if settings exist
+        # Check if settings exist by user_id
         existing = self.get_by_user(user_id)
         
         if existing:
             # Update existing settings
+            settings_id = existing["id"]
             update_data = {
                 **settings_data,
-                "updated_at": datetime.utcnow()
+                "updated_at": datetime.utcnow().isoformat()
             }
-            return super().update(user_id, update_data)
+            return self.db.update(self.collection, settings_id, update_data)
         else:
-            # Create new settings with user_id as _key
+            # Create new settings
             create_data = {
-                "_key": user_id,
+                "user_id": user_id,
                 **settings_data,
-                "updated_at": datetime.utcnow()
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": None
             }
-            return super().create(create_data)
+            return self.create(create_data)
     
     def delete_by_user(self, user_id: str) -> bool:
         """
@@ -98,4 +108,7 @@ class SettingsRepository(BaseRepository):
         Returns:
             True if deleted, False if not found
         """
-        return super().delete(user_id)
+        existing = self.get_by_user(user_id)
+        if existing:
+            return self.delete(existing["id"])
+        return False

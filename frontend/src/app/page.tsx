@@ -1,17 +1,19 @@
 "use client";
 
 /* path: frontend/src/app/page.tsx
-   version: 20 - FIXED: Removed overlay completely - panels visible without darkening background
+   version: 21
+   
+   Changes in v21:
+   - CRITICAL FIX: Pass user to useConversations({ user })
+   - Hook now reloads conversations when user changes
+   - Fixes stale data after logout/login with different user
+   - No more manual reload needed
    
    Changes in v20:
    - REMOVED: Overlay completely (was causing black screen over chat area)
    - Panels have shadow-xl which is sufficient to distinguish them
    - Chat area stays fully visible when panels are open
-   - Cleaner UX without overlay interference
-   
-   Changes in v19:
-   - Overlay moved inside chat container div (absolute instead of fixed)
-   - Sidebar gets z-40 to stay above overlay */
+   - Cleaner UX without overlay interference */
 
 import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/sidebar/Sidebar";
@@ -27,7 +29,7 @@ import type { UserGroup } from "@/types/auth";
 
 export default function Home() {
   const { user, loading, login, error } = useAuth();
-  const conversations = useConversations();
+  const conversations = useConversations({ user });
   const [showUploadPanel, setShowUploadPanel] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);

@@ -1,0 +1,11 @@
+# path: k8s/ollama/configmap.yaml
+# version: 1.0
+# Ollama configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-config
+  namespace: chatbot
+data:
+  OLLAMA_PORT: "11434"

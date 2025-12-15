@@ -1,6 +1,12 @@
 """
 Path: backend/src/main.py
-Version: 15
+Version: 16
+
+Changes in v16:
+- FIX: Bootstrap checks for ANY root user (not by email)
+- FIX: Updates existing root email if .env email differs
+- Prevents duplicate root users when ROOT_USER_EMAIL changes in .env
+- Pattern: Find root by role, update email if needed, create only if no root exists
 
 Changes in v15:
 - CRITICAL FIX: Added bootstrap_ollama() function for automatic model pull
@@ -98,10 +104,10 @@ async def bootstrap_ollama():
             )
             
             if model_exists:
-                logger.info(f"âœ“ Model '{settings.OLLAMA_MODEL}' already available")
+                logger.info(f"✓ Model '{settings.OLLAMA_MODEL}' already available")
                 logger.info("Skipping download")
             else:
-                logger.info(f"âœ— Model '{settings.OLLAMA_MODEL}' not found")
+                logger.info(f"✗ Model '{settings.OLLAMA_MODEL}' not found")
                 logger.info("")
                 logger.info("[2/2] Pulling model (this may take 30-60 seconds)...")
                 logger.info("")
@@ -110,7 +116,7 @@ async def bootstrap_ollama():
                 await ollama.pull_model(settings.OLLAMA_MODEL)
                 
                 logger.info("")
-                logger.info(f"âœ“ Model '{settings.OLLAMA_MODEL}' successfully pulled")
+                logger.info(f"✓ Model '{settings.OLLAMA_MODEL}' successfully pulled")
                 
         except Exception as e:
             logger.warning(f"Failed to check/pull Ollama model: {e}")
@@ -148,7 +154,7 @@ def bootstrap_database():
     1. Creates the database if it doesn't exist
     2. Creates all required collections
     3. Creates indexes on collections
-    4. Creates the root user if not exists
+    4. Creates or updates the root user
     
     All operations are logged explicitly.
     """
@@ -170,7 +176,7 @@ def bootstrap_database():
             password=settings.ARANGO_PASSWORD
         )
         
-        logger.info(f"      Ã¢Å“â€œ Connected to ArangoDB _system database")
+        logger.info(f"      ✓ Connected to ArangoDB _system database")
         
         # Step 2: Create database if not exists
         logger.info(f"[2/4] Checking database '{settings.ARANGO_DATABASE}'")
@@ -178,14 +184,14 @@ def bootstrap_database():
         db_exists = sys_db.has_database(settings.ARANGO_DATABASE)
         
         if db_exists:
-            logger.info(f"      Ã¢Å“â€œ Database '{settings.ARANGO_DATABASE}' already exists")
+            logger.info(f"      ✓ Database '{settings.ARANGO_DATABASE}' already exists")
         else:
-            logger.info(f"      Ã¢Å¡â„¢ Database '{settings.ARANGO_DATABASE}' does not exist, creating...")
+            logger.info(f"      ⚙ Database '{settings.ARANGO_DATABASE}' does not exist, creating...")
             try:
                 sys_db.create_database(settings.ARANGO_DATABASE)
-                logger.info(f"      Ã¢Å“â€œ Database '{settings.ARANGO_DATABASE}' created successfully")
+                logger.info(f"      ✓ Database '{settings.ARANGO_DATABASE}' created successfully")
             except DatabaseCreateError as e:
-                logger.error(f"      Ã¢Å“â€” Failed to create database: {e}")
+                logger.error(f"      ✗ Failed to create database: {e}")
                 raise
         
         # Connect to application database
@@ -218,59 +224,45 @@ def bootstrap_database():
                 "name": "conversations",
                 "indexes": [
                     {"type": "hash", "fields": ["user_id"], "unique": False},
-                    {"type": "hash", "fields": ["owner_id"], "unique": False},
-                    {"type": "hash", "fields": ["group_id"], "unique": False},
+                    {"type": "skiplist", "fields": ["created_at"], "unique": False},
                 ]
             },
             {
-                "name": "conversation_groups",
+                "name": "groups",
                 "indexes": [
-                    {"type": "hash", "fields": ["owner_id"], "unique": False},
+                    {"type": "hash", "fields": ["user_id"], "unique": False},
+                    {"type": "skiplist", "fields": ["created_at"], "unique": False},
                 ]
             },
             {
                 "name": "messages",
                 "indexes": [
                     {"type": "hash", "fields": ["conversation_id"], "unique": False},
-                    {"type": "skiplist", "fields": ["timestamp"], "unique": False},
+                    {"type": "skiplist", "fields": ["created_at"], "unique": False},
                 ]
             },
             {
                 "name": "files",
                 "indexes": [
-                    {"type": "hash", "fields": ["uploaded_by"], "unique": False},
+                    {"type": "hash", "fields": ["user_id"], "unique": False},
                     {"type": "hash", "fields": ["conversation_id"], "unique": False},
                 ]
             },
             {
-                "name": "sessions",
-                "indexes": [
-                    {"type": "hash", "fields": ["user_id"], "unique": False},
-                    {"type": "skiplist", "fields": ["expires_at"], "unique": False},
-                ]
-            },
-            {
-                "name": "settings",
+                "name": "user_settings",
                 "indexes": [
                     {"type": "hash", "fields": ["user_id"], "unique": True},
                 ]
             },
-            {
-                "name": "system_config",
-                "indexes": []
-            }
         ]
         
         for coll_config in collections_config:
             coll_name = coll_config["name"]
             
-            # Create collection
-            if db.has_collection(coll_name):
-                logger.info(f"      Ã¢Å“â€œ Collection '{coll_name}' already exists")
-            else:
-                logger.info(f"      Ã¢Å¡â„¢ Creating collection '{coll_name}'...")
+            # Create collection if not exists
+            if not db.has_collection(coll_name):
                 db.create_collection(coll_name)
-                logger.info(f"      Ã¢Å“â€œ Collection '{coll_name}' created")
+                logger.info(f"      ✓ Collection '{coll_name}' created")
             
             # Create indexes
             collection = db.collection(coll_name)
@@ -290,33 +282,61 @@ def bootstrap_database():
                             unique=index_config.get("unique", False)
                         )
                     
-                    logger.info(f"      Ã¢Å“â€œ Index on '{coll_name}' [{fields_str}]{unique_str}")
+                    logger.info(f"      ✓ Index on '{coll_name}' [{fields_str}]{unique_str}")
                 except Exception as e:
                     # Index might already exist, log but don't fail
-                    logger.debug(f"      Ã¢Å¡Â  Index already exists or error: {e}")
+                    logger.debug(f"      ⚠  Index already exists or error: {e}")
         
-        logger.info(f"      Ã¢Å“â€œ All collections and indexes ready")
+        logger.info(f"      ✓ All collections and indexes ready")
         
-        # Step 4: Create root user if not exists
+        # Step 4: Create or update root user
         logger.info(f"[4/4] Checking root user")
         
-        # FIXED v14: Use settings (reads from .env via pydantic) instead of os.getenv()
         root_email = settings.ROOT_USER_EMAIL
         root_password = settings.ROOT_USER_PASSWORD
         root_name = settings.ROOT_USER_NAME
         
         users_collection = db.collection("users")
         
-        # Check if root user exists
-        cursor = users_collection.find({"email": root_email})
-        existing_users = [doc for doc in cursor]
+        # FIXED v16: Look for ANY root user (by role, not by email)
+        cursor = users_collection.find({"role": "root"})
+        existing_roots = [doc for doc in cursor]
         
-        if existing_users:
-            logger.info(f"      Ã¢Å“â€œ Root user already exists: {root_email}")
-            logger.info(f"        User ID: {existing_users[0]['_key']}")
-            logger.info(f"        Role: {existing_users[0].get('role', 'unknown')}")
+        if existing_roots:
+            # Root user exists - check if email needs update
+            root_user = existing_roots[0]
+            current_email = root_user.get("email")
+            
+            if current_email != root_email:
+                # Email in .env differs from DB - update it
+                logger.info(f"      ⚙ Root user exists but email differs")
+                logger.info(f"        Old email: {current_email}")
+                logger.info(f"        New email: {root_email}")
+                
+                users_collection.update({
+                    "_key": root_user["_key"],
+                    "email": root_email,
+                    "name": root_name,
+                    "updated_at": datetime.now(UTC).isoformat()
+                })
+                
+                logger.info(f"      ✓ Root user email updated")
+                logger.info(f"        User ID: {root_user['_key']}")
+                logger.info(f"        Email: {root_email}")
+            else:
+                logger.info(f"      ✓ Root user already exists: {root_email}")
+                logger.info(f"        User ID: {root_user['_key']}")
+                logger.info(f"        Role: {root_user.get('role', 'unknown')}")
+            
+            # If there are multiple root users (shouldn't happen), log warning
+            if len(existing_roots) > 1:
+                logger.warning(f"      ⚠ MULTIPLE ROOT USERS FOUND: {len(existing_roots)}")
+                logger.warning(f"        This should not happen - consider cleanup")
+                for i, extra_root in enumerate(existing_roots[1:], start=2):
+                    logger.warning(f"        Root #{i}: {extra_root.get('email')} (ID: {extra_root['_key']})")
         else:
-            logger.info(f"      Ã¢Å¡â„¢ Root user not found, creating...")
+            # No root user - create one
+            logger.info(f"      ⚙ Root user not found, creating...")
             logger.info(f"        Email: {root_email}")
             logger.info(f"        Name: {root_name}")
             
@@ -334,13 +354,13 @@ def bootstrap_database():
             
             result = users_collection.insert(root_user)
             
-            logger.info(f"      Ã¢Å“â€œ Root user created successfully")
+            logger.info(f"      ✓ Root user created successfully")
             logger.info(f"        User ID: {result['_key']}")
             logger.info(f"        Email: {root_email}")
-            logger.warning(f"      Ã¢Å¡Â  DEFAULT CREDENTIALS IN USE")
+            logger.warning(f"      ⚠ DEFAULT CREDENTIALS IN USE")
             logger.warning(f"        Login: {root_email}")
             logger.warning(f"        Password: {root_password}")
-            logger.warning(f"      Ã¢Å¡Â  CHANGE PASSWORD AFTER FIRST LOGIN!")
+            logger.warning(f"      ⚠ CHANGE PASSWORD AFTER FIRST LOGIN!")
         
         logger.info("=" * 80)
         logger.info("DATABASE BOOTSTRAP - COMPLETE")
@@ -394,15 +414,15 @@ app.include_router(user_settings.router, prefix=settings.API_PREFIX, tags=["Sett
 # Include optional routers (Phase 2, 3, 4)
 if GROUPS_AVAILABLE:
     app.include_router(groups.router, prefix=settings.API_PREFIX, tags=["Groups"])
-    logger.info("Ã¢Å“â€œ Groups routes loaded")
+    logger.info("✓ Groups routes loaded")
 
 if USER_GROUPS_AVAILABLE:
     app.include_router(user_groups.router, prefix=settings.API_PREFIX, tags=["User Groups"])
-    logger.info("Ã¢Å“â€œ User Groups routes loaded")
+    logger.info("✓ User Groups routes loaded")
 
 if ADMIN_AVAILABLE:
     app.include_router(admin.router, prefix=settings.API_PREFIX, tags=["Admin"])
-    logger.info("Ã¢Å“â€œ Admin routes loaded")
+    logger.info("✓ Admin routes loaded")
 
 
 @app.on_event("startup")

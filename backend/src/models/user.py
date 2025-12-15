@@ -1,25 +1,32 @@
 """
 Path: backend/src/models/user.py
-Version: 3.0
+Version: 5.0
 
-Changes in v3.0:
-- FRONTEND COMPATIBILITY: Add firstName, lastName fields (computed from name)
-- FRONTEND COMPATIBILITY: Add isActive computed field (from status)
-- Auto-compute firstName/lastName from name if not in DB
-- Maintain backward compatibility with existing DB schema
+Changes in v5.0:
+- ADDED: group_ids field in UserResponse (was missing!)
+- Frontend needs groupIds to display user's groups
+- Serialized as groupIds via CamelCaseModel
 
-Changes in v2:
-- UserResponse now inherits from CamelCaseModel
-- Ensures camelCase serialization for frontend compatibility
+Changes in v4.0:
+- ADDED: Email validation with TLD requirement (prevents root@localhost)
+- Custom validator ensures email has valid domain with TLD
+- Matches user_repository.py v3 validation pattern
 
 User models and schemas for API requests/responses
 """
 
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
+import re
 from pydantic import BaseModel, EmailStr, Field, field_validator, computed_field
 
 from src.models.base import CamelCaseModel
+
+
+# Email regex: must have @ and domain with TLD
+EMAIL_REGEX = re.compile(
+    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+)
 
 
 class UserBase(BaseModel):
@@ -28,6 +35,25 @@ class UserBase(BaseModel):
     email: EmailStr
     role: str = Field(default="user", pattern="^(user|manager|root)$")
     status: str = Field(default="active", pattern="^(active|disabled)$")
+    
+    @field_validator('email')
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        """
+        Validate email has proper TLD
+        
+        Prevents invalid emails like:
+        - root@localhost (no TLD)
+        - user@internal (no TLD)
+        
+        Requires format: user@domain.tld
+        """
+        if not EMAIL_REGEX.match(v):
+            raise ValueError(
+                f"Invalid email format: {v}. "
+                "Email must contain @ and a valid domain with TLD (e.g., user@example.com)"
+            )
+        return v
 
 
 class UserCreate(UserBase):
@@ -70,6 +96,19 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=50)
     last_name: Optional[str] = Field(None, min_length=1, max_length=50)
     
+    @field_validator('email')
+    @classmethod
+    def validate_email_format(cls, v: Optional[str]) -> Optional[str]:
+        """Validate email has proper TLD"""
+        if v is None:
+            return v
+        if not EMAIL_REGEX.match(v):
+            raise ValueError(
+                f"Invalid email format: {v}. "
+                "Email must contain @ and a valid domain with TLD (e.g., user@example.com)"
+            )
+        return v
+    
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: Optional[str]) -> Optional[str]:
@@ -93,21 +132,24 @@ class UserResponse(CamelCaseModel):
     FRONTEND COMPATIBILITY:
     - Includes firstName, lastName (computed from name if not in DB)
     - Includes isActive (computed from status)
+    - Includes groupIds (list of group IDs user belongs to)
     - Maintains backward compatibility with name and status
     
     Inherits from CamelCaseModel for automatic camelCase serialization:
-    - created_at â†’ createdAt
-    - updated_at â†’ updatedAt
-    - last_login â†’ lastLogin
-    - first_name â†’ firstName
-    - last_name â†’ lastName
-    - is_active â†’ isActive
+    - created_at → createdAt
+    - updated_at → updatedAt
+    - last_login → lastLogin
+    - first_name → firstName
+    - last_name → lastName
+    - is_active → isActive
+    - group_ids → groupIds
     """
     id: str
     name: str
     email: str
     role: str
     status: str
+    group_ids: List[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
@@ -123,8 +165,8 @@ class UserResponse(CamelCaseModel):
         Computed field: isActive from status
         
         Maps:
-        - status == "active" â†’ isActive = true
-        - status == "disabled" â†’ isActive = false
+        - status == "active" → isActive = true
+        - status == "disabled" → isActive = false
         """
         return self.status == "active"
     
@@ -135,8 +177,8 @@ class UserResponse(CamelCaseModel):
         Rules:
         - If firstName/lastName already in DB: use them
         - Otherwise: split 'name' on first space
-          - "John Doe" â†’ firstName="John", lastName="Doe"
-          - "John" â†’ firstName="John", lastName=None
+          - "John Doe" → firstName="John", lastName="Doe"
+          - "John" → firstName="John", lastName=None
         """
         if not self.first_name and not self.last_name and self.name:
             parts = self.name.split(' ', 1)
