@@ -1,0 +1,13 @@
+# File: k8s/n8n/persistentVolumeClaim.yaml
+# Version: 1
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: n8n-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: hostpath

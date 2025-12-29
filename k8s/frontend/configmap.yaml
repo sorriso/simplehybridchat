@@ -1,0 +1,15 @@
+# path: k8s/frontend/configmap.yaml
+# version: 1.0
+# Frontend configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  # API Backend Configuration (via Caddy reverse proxy)
+  NEXT_PUBLIC_API_URL: "http://chat.kube.local"
+  # MinIO Configuration (internal access)
+  NEXT_PUBLIC_MINIO_ENDPOINT: "http://minio:9000"
+  # Disable MSW in production
+  NEXT_PUBLIC_DISABLE_MSW: "true"

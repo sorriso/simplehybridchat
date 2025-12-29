@@ -1,0 +1,76 @@
+# path: k8s/arangodb/job-init.yaml
+# version: 1.2
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: arangodb-postdeploy-init
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        job: arangodb-postdeploy-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: arango-init
+        image: arangodb:latest
+        imagePullPolicy: Always
+        env:
+          - name: ARANGO_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: arangodb-secret
+                key: ARANGO_ROOT_PASSWORD
+          - name: APP_DB_NAME
+            valueFrom:
+              secretKeyRef:
+                name: arangodb-secret
+                key: APP_DB_NAME
+          - name: APP_USER
+            valueFrom:
+              secretKeyRef:
+                name: arangodb-secret
+                key: APP_USER
+          - name: APP_USER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: arangodb-secret
+                key: APP_USER_PASSWORD
+        volumeMounts:
+          - name: init-scripts
+            mountPath: /init
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -eu
+            HOST="arangodb-service"
+            PORT=8529
+            AR_USER="${AR_USER:-root}"
+            AR_PASS="${ARANGO_ROOT_PASSWORD:?missing root password}"
+ 
+            echo "[Job] Waiting for $HOST:$PORT..."
+            for i in $(seq 1 60); do
+              if arangosh \
+                  --server.endpoint "tcp://$HOST:$PORT" \
+                  --server.username "$AR_USER" \
+                  --server.password "$AR_PASS" \
+                  --javascript.execute-string "require('@arangodb').db._version();" >/dev/null 2>&1; then
+                echo "[wait] server ready"; break
+              fi
+              sleep 2
+            done
+ 
+            echo "[Job] Running init script..."
+            arangosh \
+              --server.endpoint "tcp://$HOST:$PORT" \
+              --server.username root \
+              --server.password "$ARANGO_ROOT_PASSWORD" \
+              --javascript.execute /init/create-user.js
+            echo "[Job] Init completed."
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: arangodb-config-init

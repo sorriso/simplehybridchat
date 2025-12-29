@@ -1,0 +1,93 @@
+# path: k8s/backend/configmap.yaml
+# version: 1.2
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  # ========================================================================
+  # API Configuration
+  # ========================================================================
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  API_WORKERS: "4"
+  API_RELOAD: "false"
+  API_PREFIX: "/api"
+  
+  # ========================================================================
+  # Environment
+  # ========================================================================
+  ENVIRONMENT: "developmement"
+  LOG_LEVEL: "INFO"
+  
+  # ========================================================================
+  # CORS
+  # ========================================================================
+  CORS_ORIGINS: "http://chat.domain.local"
+  CORS_CREDENTIALS: "true"
+  
+  # ========================================================================
+  # Database - ArangoDB
+  # ========================================================================
+  DB_TYPE: "arango"
+  ARANGO_HOST: "arangodb-service"
+  ARANGO_PORT: "8529"
+  ARANGO_DATABASE: "chatbot"
+  ARANGO_USER: "arangodbuser"
+  ARANGO_ROOT_USER: "root"
+  
+  # ========================================================================
+  # Storage - MinIO
+  # ========================================================================
+  STORAGE_TYPE: "minio"
+  MINIO_HOST: "minio-service"
+  MINIO_PORT: "9000"
+  MINIO_ACCESS_KEY: "minioadminkey"
+  MINIO_SECURE: "false"
+  MINIO_DEFAULT_BUCKET: "chatbot-files"
+  
+  # ========================================================================
+  # Authentication
+  # ========================================================================
+  AUTH_MODE: "local"
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRATION_HOURS: "12"
+  ALLOW_MULTI_LOGIN: "false"
+  
+  # ========================================================================
+  # LLM Configuration - OLLAMA LOCAL
+  # ========================================================================
+  LLM_PROVIDER: "ollama"
+  LLM_TIMEOUT: "60"
+  OLLAMA_BASE_URL: "http://ollama-service:11434"
+  OLLAMA_MODEL: "tinyllama"
+  OLLAMA_MAX_TOKENS: "2000"
+  OLLAMA_TEMPERATURE: "0.7"
+  OLLAMA_TIMEOUT: "300"
+  
+  # ========================================================================
+  # Initial Root User (created on first startup)
+  # ========================================================================
+  ROOT_USER_EMAIL: "root@localhost.com"
+  ROOT_USER_NAME: "Root Admin"
+  
+  # ========================================================================
+  # File Upload
+  # ========================================================================
+  MAX_FILE_SIZE: "10485760"
+  MAX_FILES_PER_UPLOAD: "5"
+  ALLOWED_FILE_TYPES: ".txt,.pdf,.doc,.docx,.md"
+  
+  # ========================================================================
+  # Rate Limiting
+  # ========================================================================
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS: "100"
+  RATE_LIMIT_PERIOD: "60"
+  
+  # ========================================================================
+  # Maintenance Mode
+  # ========================================================================
+  MAINTENANCE_MODE: "false"
+  MAINTENANCE_MESSAGE: "System under maintenance. Please try again later."

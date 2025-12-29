@@ -1,0 +1,17 @@
+# path: k8s/caddy/service.yaml
+# version: 1.0
+# Caddy reverse proxy service
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy-service
+spec:
+  type: ClusterIP
+  selector:
+    app: caddy
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP

@@ -1,0 +1,28 @@
+# path: k8s/arangodb/configmap-init.yaml
+# version: 1.1
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arangodb-config-init
+data:
+  create-user.js: |
+    var users = require("@arangodb/users");
+    var db = require("@arangodb").db;
+ 
+    var username = process.env.APP_USER;
+    var password = process.env.APP_USER_PASSWORD;
+    var dbName = process.env.APP_DB_NAME;
+ 
+    // Crée l'utilisateur s'il n'existe pas
+    if (!users.exists(username)) {
+      users.save(username, password, true);
+    }
+ 
+    // Crée la base si elle n'existe pas
+    if (!db._databases().includes(dbName)) {
+      db._createDatabase(dbName);
+    }
+ 
+    // Assigne les droits à l'utilisateur sur la base
+    users.grantDatabase(username, dbName, "rw");

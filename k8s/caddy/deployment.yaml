@@ -1,0 +1,84 @@
+# path: k8s/caddy/deployment.yaml
+# version: 1.0
+# Caddy reverse proxy deployment
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caddy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: caddy
+  template:
+    metadata:
+      labels:
+        app: caddy
+    spec:
+      initContainers:
+        - name: wait-for-backend
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z backend 8000; do
+                echo "Waiting for Backend...";
+                sleep 2;
+              done
+        - name: wait-for-frontend
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z frontend 3000; do
+                echo "Waiting for Frontend...";
+                sleep 2;
+              done
+      containers:
+        - name: caddy
+          image: caddy:2-alpine
+
+          ports:
+            - containerPort: 3000
+              name: http
+
+          volumeMounts:
+            - name: caddy-config
+              mountPath: /etc/caddy/Caddyfile
+              subPath: Caddyfile
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+      volumes:
+        - name: caddy-config
+          configMap:
+            name: caddy-config

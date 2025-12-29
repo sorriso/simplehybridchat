@@ -1,0 +1,57 @@
+# path: k8s/kustomization.yaml
+# version: 1.0
+# Kustomize deployment order
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: chatbot
+
+resources:
+  # Namespace (must be first)
+  - namespace.yaml
+  
+  # Persistent Volume Claims
+  - arangodb/pvc.yaml
+  - minio/pvc.yaml
+  - ollama/pvc.yaml
+  - n8n/pvc.yaml
+  
+  # ConfigMaps
+  - arangodb/configmap.yaml
+  - arangodb/config-init.yaml
+  - n8n/config-init.yaml
+  - ollama/configmap.yaml
+  - backend/configmap.yaml
+  - frontend/configmap.yaml
+  - caddy/configmap.yaml
+  
+  # Secrets
+  - arangodb/secret.yaml
+  - minio/secret.yaml
+  - n8n/secret.yaml
+  - backend/secret.yaml
+  - frontend/secret.yaml
+  
+  # Services
+  - arangodb/service.yaml
+  - arangodb/job-init.yaml
+  - minio/service.yaml
+  - n8n/service.yaml
+  - ollama/service.yaml
+  - backend/service.yaml
+  - frontend/service.yaml
+  - caddy/service.yaml
+  
+  # Deployments (in dependency order)
+  - arangodb/deployment.yaml
+  - minio/deployment.yaml
+  - n8n/deployment.yaml
+  - ollama/deployment.yaml
+  - backend/deployment.yaml
+  - frontend/deployment.yaml
+  - caddy/deployment.yaml
+  
+  # Ingress (last)
+  - ingress.yaml
+  - ingress-admin.yaml

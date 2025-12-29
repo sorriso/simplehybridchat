@@ -1,3 +1,9 @@
+# =============================================================================
+# Dockerfile for Ubuntu Dev Environment
+# Version: 1.2.0
+# Description: Development container with Python 3.12, Node.js LTS, Docker tools
+# =============================================================================
+
 # Use Ubuntu Server minimal image (lightest official Ubuntu)
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
@@ -70,13 +76,25 @@ RUN useradd -m -s /bin/bash developer \
 
 RUN python3.12 -m pip install --upgrade pip setuptools wheel
 
+# Copy Python dependencies from backend directory
+COPY backend/requirements.txt /tmp/backend-requirements.txt
+COPY backend/requirements-test.txt /tmp/backend-requirements-test.txt
+
+# Install Python dependencies (including test dependencies)
+RUN python3.12 -m pip install --no-cache-dir -r /tmp/backend-requirements.txt \
+ && python3.12 -m pip install --no-cache-dir -r /tmp/backend-requirements-test.txt \
+ && rm -f /tmp/backend-requirements.txt /tmp/backend-requirements-test.txt
+
+# Copy frontend package.json and install Node.js dependencies globally
+COPY frontend/package.json /opt/frontend/package.json
+RUN cd /opt/frontend \
+ && npm install --omit=optional \
+ && npm cache clean --force
+
+# Configure NODE_PATH to make globally installed modules accessible
+ENV NODE_PATH=/opt/frontend/node_modules
+
 USER developer
-
-#COPY ./requirements.txt .
-#COPY ./requirements-test.txt .
-
-#RUN pip install -r ./requirements.txt
-#RUN pip install -r ./requirements-test.txt
 
 WORKDIR /workspace
 

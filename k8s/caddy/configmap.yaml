@@ -1,0 +1,85 @@
+# path: k8s/caddy/configmap.yaml
+# version: 1.8
+# Caddy reverse proxy configuration
+# Changes in v1.8:
+# - BACK TO BASICS: Use :3000 fallback (like before) + explicit virtual hosts
+# - :3000 handles probes and default traffic
+# - Virtual hosts handle specific domains
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-config
+  namespace: chatbot
+data:
+  Caddyfile: |
+    {
+        auto_https off
+    }
+    
+    # ===========================================================================
+    # Default / Fallback - Handles probes and chat.kube.local traffic
+    # ===========================================================================
+    :3000 {
+        handle /health {
+            respond "OK" 200
+        }
+        
+        handle /api/* {
+            reverse_proxy backend:8000
+        }
+        
+        handle {
+            reverse_proxy frontend:3000
+        }
+    }
+    
+    # ===========================================================================
+    # Admin services - Require whitelisted machine certificate fingerprint
+    # ===========================================================================
+    
+    # MinIO Console - minio.kube.local
+    minio.kube.local:3000 {
+        @allowed_fingerprints {
+            # Add your machine fingerprints here
+            # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
+        }
+
+        handle @allowed_fingerprints {
+            reverse_proxy minio-service:9001
+        }
+
+        handle {
+            respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        }
+    }
+
+    # n8n Workflow Automation - n8n.kube.local
+    n8n.kube.local:3000 {
+        @allowed_fingerprints {
+            # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
+        }
+
+        handle @allowed_fingerprints {
+            reverse_proxy n8n-service:5678
+        }
+
+        handle {
+            respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        }
+    }
+
+    # ArangoDB Web UI - arango.kube.local
+    arango.kube.local:3000 {
+        @allowed_fingerprints {
+            # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
+        }
+
+        handle @allowed_fingerprints {
+            reverse_proxy arangodb-service:8529
+        }
+
+        handle {
+            respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        }
+    }

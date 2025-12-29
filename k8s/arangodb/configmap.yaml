@@ -1,0 +1,10 @@
+# path: k8s/arangodb/configmap.yaml
+# version: 1.0
+# ArangoDB configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arangodb-config
+data:
+  ARANGO_PORT: "8529"

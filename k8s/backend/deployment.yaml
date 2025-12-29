@@ -1,0 +1,108 @@
+# path: k8s/backend/deployment.yaml
+# version: 1.2
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      initContainers:
+        - name: wait-for-arangodb
+          image: busybox:latest
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z arangodb-service 8529; do
+                echo "Waiting for ArangoDB...";
+                sleep 2;
+              done
+        - name: wait-for-minio
+          image: busybox:latest
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z minio-service 9000; do
+                echo "Waiting for MinIO...";
+                sleep 2;
+              done
+        - name: wait-for-ollama
+          image: busybox:latest
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z ollama-service 11434; do
+                echo "Waiting for Ollama...";
+                sleep 2;
+              done
+
+      containers:
+        - name: backend
+          image: localhost:5000/chatbot-backend:latest
+          imagePullPolicy: Never
+
+          ports:
+            - containerPort: 8000
+              name: http
+
+          envFrom:
+            - configMapRef:
+                name: backend-config
+
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: JWT_SECRET
+            - name: ARANGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: ARANGO_PASSWORD
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: MINIO_SECRET_KEY
+            - name: ROOT_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: ROOT_USER_PASSWORD
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5

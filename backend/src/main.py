@@ -1,6 +1,6 @@
 """
 Path: backend/src/main.py
-Version: 16
+Version: 17
 
 Changes in v16:
 - FIX: Bootstrap checks for ANY root user (not by email)
@@ -151,10 +151,14 @@ def bootstrap_database():
     Bootstrap database on application startup
     
     This function:
-    1. Creates the database if it doesn't exist
+    1. Creates the database if it doesn't exist (requires root credentials)
     2. Creates all required collections
     3. Creates indexes on collections
     4. Creates or updates the root user
+    
+    Supports two deployment modes:
+    - Docker Compose: Uses root credentials to create everything
+    - Kubernetes: Job-init creates DB, backend uses regular user
     
     All operations are logged explicitly.
     """
@@ -166,40 +170,61 @@ def bootstrap_database():
         from arango import ArangoClient
         from arango.exceptions import DatabaseCreateError
         
-        # Step 1: Connect to ArangoDB
-        logger.info(f"[1/4] Connecting to ArangoDB at {settings.ARANGO_HOST}:{settings.ARANGO_PORT}")
-        
         client = ArangoClient(hosts=f"http://{settings.ARANGO_HOST}:{settings.ARANGO_PORT}")
-        sys_db = client.db(
-            "_system",
-            username=settings.ARANGO_USER,
-            password=settings.ARANGO_PASSWORD
-        )
         
-        logger.info(f"      ✓ Connected to ArangoDB _system database")
+        # Step 1: Try to create database with root credentials (if available)
+        logger.info(f"[1/4] Checking database '{settings.ARANGO_DATABASE}'")
         
-        # Step 2: Create database if not exists
-        logger.info(f"[2/4] Checking database '{settings.ARANGO_DATABASE}'")
+        db = None
+        db_created = False
         
-        db_exists = sys_db.has_database(settings.ARANGO_DATABASE)
+        # Check if root credentials are available (for Docker Compose)
+        root_user = getattr(settings, 'ARANGO_ROOT_USER', None)
+        root_password = getattr(settings, 'ARANGO_ROOT_PASSWORD', None)
         
-        if db_exists:
-            logger.info(f"      ✓ Database '{settings.ARANGO_DATABASE}' already exists")
-        else:
-            logger.info(f"      ⚙ Database '{settings.ARANGO_DATABASE}' does not exist, creating...")
+        if root_user and root_password:
+            # Docker Compose mode: use root to create DB
             try:
-                sys_db.create_database(settings.ARANGO_DATABASE)
-                logger.info(f"      ✓ Database '{settings.ARANGO_DATABASE}' created successfully")
-            except DatabaseCreateError as e:
-                logger.error(f"      ✗ Failed to create database: {e}")
-                raise
+                logger.info(f"      Attempting with root credentials: {root_user}")
+                sys_db = client.db(
+                    "_system",
+                    username=root_user,
+                    password=root_password
+                )
+                
+                logger.info(f"      ✓ Connected to ArangoDB _system database")
+                
+                db_exists = sys_db.has_database(settings.ARANGO_DATABASE)
+                
+                if db_exists:
+                    logger.info(f"      ✓ Database '{settings.ARANGO_DATABASE}' already exists")
+                else:
+                    logger.info(f"      ⚙ Creating database '{settings.ARANGO_DATABASE}'...")
+                    sys_db.create_database(settings.ARANGO_DATABASE)
+                    logger.info(f"      ✓ Database '{settings.ARANGO_DATABASE}' created successfully")
+                    db_created = True
+                    
+            except Exception as e:
+                logger.warning(f"      ⚠ Root connection failed: {e}")
+                logger.warning(f"      Assuming database exists (Kubernetes mode)")
+        else:
+            # Kubernetes mode: database created by job-init
+            logger.info(f"      No root credentials - assuming database exists (Kubernetes mode)")
         
-        # Connect to application database
-        db = client.db(
-            settings.ARANGO_DATABASE,
-            username=settings.ARANGO_USER,
-            password=settings.ARANGO_PASSWORD
-        )
+        # Step 2: Connect to application database with regular user
+        logger.info(f"[2/4] Connecting to database '{settings.ARANGO_DATABASE}'")
+        logger.info(f"      User: {settings.ARANGO_USER}")
+        
+        try:
+            db = client.db(
+                settings.ARANGO_DATABASE,
+                username=settings.ARANGO_USER,
+                password=settings.ARANGO_PASSWORD
+            )
+            logger.info(f"      ✓ Connected to database '{settings.ARANGO_DATABASE}'")
+        except Exception as e:
+            logger.error(f"      ✗ Failed to connect to database: {e}")
+            raise
         
         # Step 3: Create collections and indexes
         logger.info(f"[3/4] Creating collections and indexes")
@@ -217,6 +242,12 @@ def bootstrap_database():
                 "name": "user_groups",
                 "indexes": [
                     {"type": "hash", "fields": ["name"], "unique": False},
+                ]
+            },
+            {
+                "name": "groups",
+                "indexes": [
+                    {"type": "hash", "fields": ["name"], "unique": True},
                     {"type": "hash", "fields": ["status"], "unique": False},
                 ]
             },
@@ -224,21 +255,13 @@ def bootstrap_database():
                 "name": "conversations",
                 "indexes": [
                     {"type": "hash", "fields": ["user_id"], "unique": False},
-                    {"type": "skiplist", "fields": ["created_at"], "unique": False},
-                ]
-            },
-            {
-                "name": "groups",
-                "indexes": [
-                    {"type": "hash", "fields": ["user_id"], "unique": False},
-                    {"type": "skiplist", "fields": ["created_at"], "unique": False},
+                    {"type": "hash", "fields": ["status"], "unique": False},
                 ]
             },
             {
                 "name": "messages",
                 "indexes": [
                     {"type": "hash", "fields": ["conversation_id"], "unique": False},
-                    {"type": "skiplist", "fields": ["created_at"], "unique": False},
                 ]
             },
             {
@@ -249,45 +272,39 @@ def bootstrap_database():
                 ]
             },
             {
-                "name": "user_settings",
+                "name": "settings",
                 "indexes": [
                     {"type": "hash", "fields": ["user_id"], "unique": True},
                 ]
-            },
+            }
         ]
         
-        for coll_config in collections_config:
-            coll_name = coll_config["name"]
+        for collection_config in collections_config:
+            collection_name = collection_config["name"]
             
-            # Create collection if not exists
-            if not db.has_collection(coll_name):
-                db.create_collection(coll_name)
-                logger.info(f"      ✓ Collection '{coll_name}' created")
+            # Create collection if it doesn't exist
+            if not db.has_collection(collection_name):
+                db.create_collection(collection_name)
+                logger.info(f"      ✓ Collection '{collection_name}' created")
+            else:
+                logger.info(f"      ✓ Collection '{collection_name}' already exists")
             
             # Create indexes
-            collection = db.collection(coll_name)
-            for index_config in coll_config["indexes"]:
+            collection = db.collection(collection_name)
+            for index_config in collection_config["indexes"]:
                 try:
-                    fields_str = ", ".join(index_config["fields"])
-                    unique_str = " (unique)" if index_config.get("unique") else ""
-                    
-                    if index_config["type"] == "hash":
-                        collection.add_hash_index(
-                            fields=index_config["fields"],
-                            unique=index_config.get("unique", False)
-                        )
-                    elif index_config["type"] == "skiplist":
-                        collection.add_skiplist_index(
-                            fields=index_config["fields"],
-                            unique=index_config.get("unique", False)
-                        )
-                    
-                    logger.info(f"      ✓ Index on '{coll_name}' [{fields_str}]{unique_str}")
+                    collection.add_hash_index(
+                        fields=index_config["fields"],
+                        unique=index_config["unique"]
+                    )
+                    index_desc = f"{'unique' if index_config['unique'] else 'non-unique'} index on {index_config['fields']}"
+                    logger.info(f"        ✓ {index_desc}")
                 except Exception as e:
-                    # Index might already exist, log but don't fail
-                    logger.debug(f"      ⚠  Index already exists or error: {e}")
-        
-        logger.info(f"      ✓ All collections and indexes ready")
+                    # Index might already exist
+                    if "duplicate" in str(e).lower() or "already" in str(e).lower():
+                        logger.info(f"        ✓ Index on {index_config['fields']} already exists")
+                    else:
+                        logger.warning(f"        ⚠ Failed to create index on {index_config['fields']}: {e}")
         
         # Step 4: Create or update root user
         logger.info(f"[4/4] Checking root user")
@@ -298,7 +315,7 @@ def bootstrap_database():
         
         users_collection = db.collection("users")
         
-        # FIXED v16: Look for ANY root user (by role, not by email)
+        # Look for ANY root user (by role, not by email)
         cursor = users_collection.find({"role": "root"})
         existing_roots = [doc for doc in cursor]
         
@@ -376,9 +393,10 @@ def bootstrap_database():
         logger.error("=" * 80)
         logger.error("APPLICATION WILL NOT START PROPERLY")
         logger.error("Please check:")
-        logger.error("  1. ArangoDB is running (http://localhost:8529)")
-        logger.error("  2. Credentials in .env are correct")
+        logger.error("  1. ArangoDB is running")
+        logger.error(f"  2. Credentials are correct (user: {settings.ARANGO_USER})")
         logger.error("  3. Network connectivity to ArangoDB")
+        logger.error("  4. Database exists (or root credentials provided)")
         logger.error("=" * 80)
         # Don't raise - let application start but log the error
         # This allows health checks to work even if DB is down

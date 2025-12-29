@@ -1,21 +1,26 @@
 # path: Makefile
-# version: 6.1
+# version: 6.3
+# Changes in v6.3:
+# - Added automatic patch for nginx ingress controller after installation
+# - Enables snippet annotations for custom nginx configuration
+# Changes in v6.2:
+# - Added install-ingress-kube command to install NGINX Ingress Controller v1.14.1
 # Changes in v6.1:
-# - Added build-images-kube command to build Docker images for Kubernetes
+# - Added build-images-kube command to build Docker images for k8s
 # - up-kube now builds images before deploying
 # - Added REGISTRY and IMAGE_TAG variables for image configuration
 #
 # Development environment: Docker Compose
-# Production: Kubernetes
+# Production: k8s
 
-# Kubernetes image configuration
+# k8s image configuration
 REGISTRY ?= localhost:5000
 IMAGE_TAG ?= latest
 BACKEND_IMAGE = $(REGISTRY)/chatbot-backend:$(IMAGE_TAG)
 FRONTEND_IMAGE = $(REGISTRY)/chatbot-frontend:$(IMAGE_TAG)
 
 .PHONY: help up down logs clean rebuild rebuild-frontend rebuild-backend rebuild-all clean-images
-.PHONY: up-kube down-kube logs-kube status-kube build-images-kube
+.PHONY: up-kube down-kube logs-kube status-kube build-images-kube install-ingress-kube
 
 .DEFAULT_GOAL := help
 
@@ -32,14 +37,15 @@ help: ## Show help
 	@echo "  make rebuild-all         - Rebuild all services (delete old images + no cache)"
 	@echo "  make clean-images        - Remove all project images"
 	@echo ""
-	@echo "Kubernetes Commands:"
-	@echo "  make build-images-kube   - Build Docker images for Kubernetes"
-	@echo "  make up-kube             - Build images + Deploy to Kubernetes"
-	@echo "  make down-kube           - Remove from Kubernetes"
-	@echo "  make status-kube         - Show Kubernetes deployment status"
-	@echo "  make logs-kube           - Show Kubernetes pod logs"
+	@echo "k8s Commands:"
+	@echo "  make install-ingress-kube - Install NGINX Ingress Controller v1.14.1"
+	@echo "  make build-images-kube   - Build Docker images for k8s"
+	@echo "  make up-kube             - Build images + Deploy to k8s"
+	@echo "  make down-kube           - Remove from k8s"
+	@echo "  make status-kube         - Show k8s deployment status"
+	@echo "  make logs-kube           - Show k8s pod logs"
 	@echo ""
-	@echo "Kubernetes Configuration:"
+	@echo "k8s Configuration:"
 	@echo "  REGISTRY=<registry>      - Docker registry (default: localhost:5000)"
 	@echo "  IMAGE_TAG=<tag>          - Image tag (default: latest)"
 	@echo "  Example: make up-kube REGISTRY=myregistry.io IMAGE_TAG=v1.0.0"
@@ -51,7 +57,7 @@ help: ## Show help
 	@echo "  ArangoDB:  http://localhost:8529 (root/changeme)"
 	@echo "  MinIO:     http://localhost:9001 (minioadmin/minioadmin)"
 	@echo ""
-	@echo "URLs (Kubernetes):"
+	@echo "URLs (k8s):"
 	@echo "  Application: http://app.domain.local (configure /etc/hosts)"
 	@echo ""
 
@@ -142,10 +148,49 @@ clean-images: ## Remove all project images
 	@echo "✅ Images removed"
 
 # =============================================================================
-# Kubernetes Commands
+# k8s Commands
 # =============================================================================
 
-build-images-kube: ## Build Docker images for Kubernetes
+install-ingress-kube: ## Install NGINX Ingress Controller v1.14.1
+	@echo "🔄 Installing NGINX Ingress Controller v1.14.1..."
+	@kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.14.1/deploy/static/provider/cloud/deploy.yaml
+	@echo "✅ NGINX Ingress Controller manifest applied"
+	@echo ""
+	@echo "⏳ Waiting for ingress controller to be ready (this may take a few minutes)..."
+	@kubectl wait --namespace ingress-nginx \
+		--for=condition=ready pod \
+		--selector=app.kubernetes.io/component=controller \
+		--timeout=300s
+	@echo ""
+	@echo "✅ NGINX Ingress Controller is ready!"
+	@echo ""
+	@echo "🔧 Applying patches to enable snippet annotations..."
+	@echo "   → Patching deployment..."
+	@kubectl patch deployment ingress-nginx-controller -n ingress-nginx \
+		--type='json' --patch-file k8s/nginx-ingress-controller-patch.json
+	@echo "   → Patching configmap..."
+	@kubectl patch configmap ingress-nginx-controller -n ingress-nginx \
+		--type='merge' --patch-file k8s/nginx-ingress-configmap-patch.json
+	@echo "✅ Patches applied successfully"
+	@echo ""
+	@echo "♻️  Restarting ingress controller..."
+	@kubectl delete pods -n ingress-nginx -l app.kubernetes.io/component=controller
+	@echo "✅ Pod deleted, waiting for new pod to be ready..."
+	@echo ""
+	@echo "⏳ Waiting for controller to restart with new configuration..."
+	@kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=120s
+	@echo ""
+	@echo "✅ NGINX Ingress Controller patched and ready!"
+	@echo ""
+	@echo "📊 Ingress controller status:"
+	@kubectl get pods -n ingress-nginx
+	@echo ""
+	@kubectl get svc -n ingress-nginx
+	@echo ""
+	@echo "⚠️  Note: This project will be retired in March 2026"
+	@echo "    Consider migrating to Gateway API or F5 NGINX Ingress Controller"
+
+build-images-kube: ## Build Docker images for k8s
 	@echo "🔨 Building backend image: $(BACKEND_IMAGE)"
 	docker build -t $(BACKEND_IMAGE) ./backend
 	@echo "✅ Backend image built"
@@ -164,16 +209,16 @@ build-images-kube: ## Build Docker images for Kubernetes
 		echo "  docker push $(FRONTEND_IMAGE)"; \
 	fi
 
-up-kube: build-images-kube ## Build images + Deploy to Kubernetes using kustomization.yaml
+up-kube: build-images-kube ## Build images + Deploy to k8s using kustomization.yaml
 	@echo ""
 	@echo "🔄 Updating deployment images..."
-	@sed -i.bak "s|image:.*chatbot-backend:.*|image: $(BACKEND_IMAGE)|g" kubernetes/backend/deployment.yaml
-	@sed -i.bak "s|image:.*chatbot-frontend:.*|image: $(FRONTEND_IMAGE)|g" kubernetes/frontend/deployment.yaml
-	@rm -f kubernetes/backend/deployment.yaml.bak kubernetes/frontend/deployment.yaml.bak
+	@sed -i.bak "s|image:.*chatbot-backend:.*|image: $(BACKEND_IMAGE)|g" k8s/backend/deployment.yaml
+	@sed -i.bak "s|image:.*chatbot-frontend:.*|image: $(FRONTEND_IMAGE)|g" k8s/frontend/deployment.yaml
+	@rm -f k8s/backend/deployment.yaml.bak k8s/frontend/deployment.yaml.bak
 	@echo "✅ Deployment images updated"
 	@echo ""
-	@echo "🚀 Deploying to Kubernetes..."
-	kubectl apply -k kubernetes/
+	@echo "🚀 Deploying to k8s..."
+	kubectl apply -k k8s/
 	@echo "✅ Deployment completed"
 	@echo ""
 	@echo "⏳ Waiting for pods to be ready (this may take a few minutes)..."
@@ -188,17 +233,17 @@ up-kube: build-images-kube ## Build images + Deploy to Kubernetes using kustomiz
 	@echo "✅ All pods are ready!"
 	@echo ""
 	@echo "📊 Current status:"
-	@kubectl get pods -n chatbot
+	@kubectl get pods -n chatbotmake 
 	@echo ""
 	@echo "🌐 Access your application at: http://app.domain.local"
 	@echo "⚠️  Don't forget to add '127.0.0.1 app.domain.local' to /etc/hosts"
 
-down-kube: ## Remove deployment from Kubernetes
-	@echo "🛑 Removing deployment from Kubernetes..."
-	kubectl delete -k kubernetes/
+down-kube: ## Remove deployment from k8s
+	@echo "🛑 Removing deployment from k8s..."
+	kubectl delete -k k8s/
 	@echo "✅ Deployment removed"
 
-status-kube: ## Show Kubernetes deployment status
+status-kube: ## Show k8s deployment status
 	@echo "📊 Namespace chatbot status:"
 	@echo ""
 	@echo "=== Pods ==="
@@ -213,7 +258,7 @@ status-kube: ## Show Kubernetes deployment status
 	@echo "=== Persistent Volume Claims ==="
 	@kubectl get pvc -n chatbot
 
-logs-kube: ## Show logs from Kubernetes pods (use POD=<name> or APP=<app-label>)
+logs-kube: ## Show logs from k8s pods (use POD=<name> or APP=<app-label>)
 	@if [ -n "$(POD)" ]; then \
 		echo "📋 Logs for pod $(POD):"; \
 		kubectl logs -n chatbot $(POD) -f; \
