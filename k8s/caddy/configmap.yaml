@@ -26,11 +26,11 @@ data:
         }
         
         handle /api/* {
-            reverse_proxy backend:8000
+            reverse_proxy backend-service:8000
         }
         
         handle {
-            reverse_proxy frontend:3000
+            reverse_proxy frontend-service:3000
         }
     }
     
@@ -40,46 +40,55 @@ data:
     
     # MinIO Console - minio.kube.local
     minio.kube.local:3000 {
-        @allowed_fingerprints {
-            # Add your machine fingerprints here
-            # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
-        }
+        # @allowed_fingerprints {
+        #     # Add your machine fingerprints here
+        #     # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
+        # }
 
-        handle @allowed_fingerprints {
-            reverse_proxy minio-service:9001
-        }
+        # handle @allowed_fingerprints {
+        #     reverse_proxy minio-service:9001
+        # }
 
+        # handle {
+        #     respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        # }
         handle {
-            respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+            reverse_proxy minio-service:9001
         }
     }
 
     # n8n Workflow Automation - n8n.kube.local
     n8n.kube.local:3000 {
-        @allowed_fingerprints {
-            # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
-        }
+        # @allowed_fingerprints {
+        #     # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
+        # }
 
-        handle @allowed_fingerprints {
-            reverse_proxy n8n-service:5678
-        }
+        # handle @allowed_fingerprints {
+        #     reverse_proxy n8n-service:5678
+        # }
 
+        # handle {
+        #     respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        # }
         handle {
-            respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+            reverse_proxy n8n-service:9001
         }
     }
 
     # ArangoDB Web UI - arango.kube.local
     arango.kube.local:3000 {
-        @allowed_fingerprints {
-            # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
-        }
+        # @allowed_fingerprints {
+        #     # header X-Client-Cert-Fingerprint "YOUR_FINGERPRINT_HERE"
+        # }
 
-        handle @allowed_fingerprints {
-            reverse_proxy arangodb-service:8529
-        }
+        # handle @allowed_fingerprints {
+        #     reverse_proxy arangodb-service:8529
+        # }
 
+        # handle {
+        #     respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        # }
         handle {
-            respond "403 Forbidden - Machine not authorized\nFingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+            reverse_proxy arangodb-service:9001
         }
     }

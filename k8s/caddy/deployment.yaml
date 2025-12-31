@@ -58,25 +58,25 @@ spec:
               memory: "256Mi"
               cpu: "200m"
 
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-              httpHeaders:
-                - name: Host
-                  value: localhost
-            initialDelaySeconds: 10
-            periodSeconds: 10
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: 3000
+          #     httpHeaders:
+          #       - name: Host
+          #         value: localhost
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 10
 
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-              httpHeaders:
-                - name: Host
-                  value: localhost
-            initialDelaySeconds: 5
-            periodSeconds: 5
+          # readinessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: 3000
+          #     httpHeaders:
+          #       - name: Host
+          #         value: localhost
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 5
 
       volumes:
         - name: caddy-config
