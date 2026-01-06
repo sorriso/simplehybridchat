@@ -1,21 +1,96 @@
 # path: k8s/ingress.yaml
-# version: 1.3
+# version: 2.0
+# Unified Nginx Ingress configuration for all services
+# Changes in v2.0:
+# - Merged ingress.yaml and ingress-admin.yaml
+# - Public service (chat.kube.local): No client certificate required
+# - Admin services (minio/n8n/arango.kube.local): Client certificate fingerprint required
+# - Uses auth-tls-verify-client: optional_no_ca (accepts any client certificate)
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: chatbot-ingress
+  namespace: chatbot
   annotations:
     kubernetes.io/ingress.class: nginx
+    
+    # Enable optional client certificate verification (no CA validation)
+    # Client can connect without certificate for public services
+    # Admin services will filter based on fingerprint whitelist in Caddy
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "optional_no_ca"
+    nginx.ingress.kubernetes.io/auth-tls-secret: "chatbot/client-ca-secret"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
+    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "false"
+    
+    # Pass client certificate fingerprint to Caddy for all services
+    # Caddy will decide which services require certificate verification
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Client-Cert-Fingerprint $ssl_client_fingerprint;
+      proxy_set_header X-Client-Cert-DN $ssl_client_s_dn;
+      proxy_set_header X-Client-Cert-Verify $ssl_client_verify;
+    
+    # Proxy settings
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
 spec:
+  tls:
+    - hosts:
+        - chat.kube.local
+        - minio.kube.local
+        - n8n.kube.local
+        - arango.kube.local
+      # Using default self-signed certificate from ingress controller
+      # In production, specify secretName with real TLS certificate
   rules:
+    # =================================================================
+    # PUBLIC SERVICE - No client certificate required
+    # =================================================================
+    
     # Main application (frontend + backend via Caddy)
-    # No client certificate required for public access
     - host: chat.kube.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: caddy-service
+                port:
+                  number: 3000
+    
+    # =================================================================
+    # ADMIN SERVICES - Require whitelisted client certificate fingerprint
+    # =================================================================
+    
+    # MinIO Console (requires whitelisted machine certificate)
+    - host: minio.kube.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: caddy-service
+                port:
+                  number: 3000
+    
+    # n8n Workflow Automation (requires whitelisted machine certificate)
+    - host: n8n.kube.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: caddy-service
+                port:
+                  number: 3000
+    
+    # ArangoDB Web UI (requires whitelisted machine certificate)
+    - host: arango.kube.local
       http:
         paths:
           - path: /
