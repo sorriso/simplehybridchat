@@ -7,7 +7,7 @@
 # Changes in v1.1:
 # - Added install-ingress and uninstall-ingress commands
 
-.PHONY: help install-ingress uninstall-ingress deploy-all undeploy-all generate-certs deploy-ca test clean
+.PHONY: help install-ingress uninstall-ingress deploy-all undeploy-all generate-certs deploy-ca whitelist apply-caddy test clean
 
 .DEFAULT_GOAL := help
 
@@ -26,19 +26,27 @@ help: ## Show help
 	@echo "Testing Commands:"
 	@echo "  make -f Makefile.test-fingerprint generate-certs    - Generate test CA and client certificates"
 	@echo "  make -f Makefile.test-fingerprint deploy-ca         - Deploy test CA to k8s"
+	@echo "  make -f Makefile.test-fingerprint whitelist         - Whitelist client.crt fingerprint in Caddy"
+	@echo "  make -f Makefile.test-fingerprint apply-caddy       - Apply Caddy config and restart pod"
 	@echo "  make -f Makefile.test-fingerprint test              - Run fingerprint capture test"
 	@echo "  make -f Makefile.test-fingerprint clean             - Remove test certificates and CA secret"
 	@echo ""
 	@echo "Complete Workflow:"
 	@echo "  1. make -f Makefile.test-fingerprint install-ingress"
-	@echo "  2. make -f Makefile.test-fingerprint deploy-all"
-	@echo "  3. make -f Makefile.test-fingerprint generate-certs"
-	@echo "  4. make -f Makefile.test-fingerprint deploy-ca"
-	@echo "  5. Add to /etc/hosts: 127.0.0.1 app.kube.local admin.kube.local"
-	@echo "  6. make -f Makefile.test-fingerprint test"
+	@echo "  2. make -f Makefile.test-fingerprint generate-certs"
+	@echo "  3. make -f Makefile.test-fingerprint deploy-ca"
+	@echo "  4. make -f Makefile.test-fingerprint deploy-all"
+	@echo "  5. make -f Makefile.test-fingerprint whitelist       (optional, whitelists client.crt)"
+	@echo "  6. make -f Makefile.test-fingerprint apply-caddy     (if whitelist was done)"
+	@echo "  7. make -f Makefile.test-fingerprint test"
+	@echo ""
+	@echo "Note: CA is created once and reused. To add new clients:"
+	@echo "  - Generate: ./scripts/generate-additional-client.sh <client-name>"
+	@echo "  - Whitelist: ./scripts/whitelist-fingerprint.sh test-certs/<client-name>.crt"
+	@echo "  - Apply: make -f Makefile.test-fingerprint apply-caddy"
 	@echo ""
 	@echo "Architecture:"
-	@echo "  Browser -> Ingress -> Caddy -> app-service (NGINX) or admin-service (NGINX)"
+	@echo "  Browser -> Ingress (NodePort) -> Caddy -> app-service or admin-service (NGINX)"
 	@echo ""
 
 # =============================================================================
@@ -149,6 +157,27 @@ deploy-ca: ## Deploy test CA certificate to k8s
 		-n chatbot \
 		--dry-run=client -o yaml | kubectl apply -f -
 	@echo "✅ Test CA secret deployed"
+
+whitelist: ## Whitelist client.crt fingerprint in Caddy configmap
+	@if [ ! -f test-certs/client.crt ]; then \
+		echo "❌ Error: Client certificate not found!"; \
+		echo "   Run 'make -f Makefile.test-fingerprint generate-certs' first"; \
+		exit 1; \
+	fi
+	@echo "🔐 Whitelisting client certificate fingerprint..."
+	@chmod +x scripts/whitelist-fingerprint.sh
+	@./scripts/whitelist-fingerprint.sh test-certs/client.crt
+	@echo ""
+	@echo "💡 Don't forget to apply: make -f Makefile.test-fingerprint apply-caddy"
+
+apply-caddy: ## Apply Caddy configmap and restart pod
+	@echo "📦 Applying Caddy configuration..."
+	@kubectl apply -f caddy/configmap.yaml
+	@echo "🔄 Restarting Caddy pod..."
+	@kubectl delete pod -l app=caddy -n chatbot
+	@echo "⏳ Waiting for Caddy to be ready..."
+	@kubectl wait --for=condition=ready pod -l app=caddy -n chatbot --timeout=60s 2>/dev/null || echo "Caddy is starting..."
+	@echo "✅ Caddy configuration applied and pod restarted"
 
 test: ## Run fingerprint capture test with curl
 	@if [ ! -f test-certs/client.crt ]; then \
