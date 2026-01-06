@@ -1,0 +1,18 @@
+# path: testIngress/admin/service.yaml
+# version: 1.0
+# Kubernetes service for admin
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-service
+  namespace: chatbot
+spec:
+  type: ClusterIP
+  selector:
+    app: admin
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

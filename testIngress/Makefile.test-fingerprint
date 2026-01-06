@@ -1,0 +1,171 @@
+# path: Makefile.test-fingerprint
+# version: 1.2
+# Dedicated Makefile for ssl_client_fingerprint testing
+# Changes in v1.2:
+# - Added deploy-all and undeploy-all commands for complete test infrastructure
+# - Updated architecture: Ingress -> Caddy -> app-service/admin-service (NGINX)
+# Changes in v1.1:
+# - Added install-ingress and uninstall-ingress commands
+
+.PHONY: help install-ingress uninstall-ingress deploy-all undeploy-all generate-certs deploy-ca test clean
+
+.DEFAULT_GOAL := help
+
+help: ## Show help
+	@echo "SSL Client Fingerprint Testing"
+	@echo "==============================="
+	@echo ""
+	@echo "Infrastructure Commands:"
+	@echo "  make -f Makefile.test-fingerprint install-ingress   - Install NGINX Ingress Controller with patches"
+	@echo "  make -f Makefile.test-fingerprint uninstall-ingress - Uninstall NGINX Ingress Controller"
+	@echo ""
+	@echo "Deployment Commands:"
+	@echo "  make -f Makefile.test-fingerprint deploy-all        - Deploy complete test infrastructure"
+	@echo "  make -f Makefile.test-fingerprint undeploy-all      - Remove complete test infrastructure"
+	@echo ""
+	@echo "Testing Commands:"
+	@echo "  make -f Makefile.test-fingerprint generate-certs    - Generate test CA and client certificates"
+	@echo "  make -f Makefile.test-fingerprint deploy-ca         - Deploy test CA to k8s"
+	@echo "  make -f Makefile.test-fingerprint test              - Run fingerprint capture test"
+	@echo "  make -f Makefile.test-fingerprint clean             - Remove test certificates and CA secret"
+	@echo ""
+	@echo "Complete Workflow:"
+	@echo "  1. make -f Makefile.test-fingerprint install-ingress"
+	@echo "  2. make -f Makefile.test-fingerprint deploy-all"
+	@echo "  3. make -f Makefile.test-fingerprint generate-certs"
+	@echo "  4. make -f Makefile.test-fingerprint deploy-ca"
+	@echo "  5. Add to /etc/hosts: 127.0.0.1 app.kube.local admin.kube.local"
+	@echo "  6. make -f Makefile.test-fingerprint test"
+	@echo ""
+	@echo "Architecture:"
+	@echo "  Browser -> Ingress -> Caddy -> app-service (NGINX) or admin-service (NGINX)"
+	@echo ""
+
+# =============================================================================
+# Infrastructure Commands
+# =============================================================================
+
+install-ingress: ## Install NGINX Ingress Controller v1.14.1 with patches
+	@echo "🔄 Installing NGINX Ingress Controller v1.14.1..."
+	@kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.14.1/deploy/static/provider/cloud/deploy.yaml
+	@echo "✅ NGINX Ingress Controller manifest applied"
+	@echo ""
+	@echo "⏳ Waiting for ingress controller to be ready (this may take a few minutes)..."
+	@kubectl wait --namespace ingress-nginx \
+		--for=condition=ready pod \
+		--selector=app.kubernetes.io/component=controller \
+		--timeout=300s
+	@echo ""
+	@echo "✅ NGINX Ingress Controller is ready!"
+	@echo ""
+	@echo "🔧 Applying patches to enable snippet annotations..."
+	@echo "   → Patching deployment..."
+	@kubectl patch deployment ingress-nginx-controller -n ingress-nginx \
+		--type='json' --patch-file k8s/nginx-ingress-controller-patch.json
+	@echo "   → Patching configmap..."
+	@kubectl patch configmap ingress-nginx-controller -n ingress-nginx \
+		--type='merge' --patch-file k8s/nginx-ingress-configmap-patch.json
+	@echo "✅ Patches applied successfully"
+	@echo ""
+	@echo "♻️  Restarting ingress controller..."
+	@kubectl delete pods -n ingress-nginx -l app.kubernetes.io/component=controller
+	@echo "✅ Pod deleted, waiting for new pod to be ready..."
+	@echo ""
+	@echo "⏳ Waiting for controller to restart with new configuration..."
+	@kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=120s
+	@echo ""
+	@echo "✅ NGINX Ingress Controller patched and ready!"
+	@echo ""
+	@echo "📊 Ingress controller status:"
+	@kubectl get pods -n ingress-nginx
+	@echo ""
+	@kubectl get svc -n ingress-nginx
+
+uninstall-ingress: ## Uninstall NGINX Ingress Controller
+	@echo "🛑 Uninstalling NGINX Ingress Controller..."
+	@kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.14.1/deploy/static/provider/cloud/deploy.yaml 2>/dev/null || echo "Already uninstalled"
+	@echo "✅ NGINX Ingress Controller uninstalled"
+	@echo ""
+	@echo "📊 Checking remaining resources..."
+	@kubectl get namespace ingress-nginx 2>/dev/null || echo "Namespace ingress-nginx removed"
+
+# =============================================================================
+# Deployment Commands
+# =============================================================================
+
+deploy-all: ## Deploy complete test infrastructure (namespace + app + admin + caddy + ingress)
+	@echo "🚀 Deploying complete test infrastructure..."
+	@echo ""
+	@echo "📦 Creating namespace chatbot..."
+	@kubectl apply -f namespace.yaml
+	@echo ""
+	@echo "📦 Deploying resources via kustomize..."
+	@kubectl apply -k .
+	@echo ""
+	@echo "⏳ Waiting for pods to be ready..."
+	@kubectl wait --for=condition=ready pod -l app=app -n chatbot --timeout=60s 2>/dev/null || true
+	@kubectl wait --for=condition=ready pod -l app=admin -n chatbot --timeout=60s 2>/dev/null || true
+	@kubectl wait --for=condition=ready pod -l app=caddy -n chatbot --timeout=60s 2>/dev/null || true
+	@echo ""
+	@echo "✅ Test infrastructure deployed!"
+	@echo ""
+	@echo "📊 Current status:"
+	@kubectl get pods -n chatbot
+	@echo ""
+	@kubectl get svc -n chatbot
+	@echo ""
+	@kubectl get ingress -n chatbot
+	@echo ""
+	@echo "💡 Next steps:"
+	@echo "   1. Add to /etc/hosts: echo '127.0.0.1 app.kube.local admin.kube.local' | sudo tee -a /etc/hosts"
+	@echo "   2. Generate certificates: make -f Makefile.test-fingerprint generate-certs"
+	@echo "   3. Deploy CA: make -f Makefile.test-fingerprint deploy-ca"
+	@echo "   4. Run test: make -f Makefile.test-fingerprint test"
+
+undeploy-all: ## Remove complete test infrastructure
+	@echo "🛑 Removing test infrastructure..."
+	@kubectl delete -k . 2>/dev/null || echo "Resources already removed"
+	@kubectl delete namespace chatbot 2>/dev/null || echo "Namespace already removed"
+	@echo "✅ Test infrastructure removed"
+
+# =============================================================================
+# Testing Commands
+# =============================================================================
+
+generate-certs: ## Generate test CA and client certificates
+	@echo "🔐 Generating test certificates..."
+	@chmod +x scripts/generate-test-certs.sh
+	@./scripts/generate-test-certs.sh
+
+deploy-ca: ## Deploy test CA certificate to k8s
+	@if [ ! -f test-certs/ca.crt ]; then \
+		echo "❌ Error: CA certificate not found!"; \
+		echo "   Run 'make -f Makefile.test-fingerprint generate-certs' first"; \
+		exit 1; \
+	fi
+	@echo "📦 Creating test-ca-secret in k8s..."
+	@kubectl create secret generic test-ca-secret \
+		--from-file=ca.crt=test-certs/ca.crt \
+		-n chatbot \
+		--dry-run=client -o yaml | kubectl apply -f -
+	@echo "✅ Test CA secret deployed"
+
+test: ## Run fingerprint capture test with curl
+	@if [ ! -f test-certs/client.crt ]; then \
+		echo "❌ Error: Client certificate not found!"; \
+		echo "   Run 'make -f Makefile.test-fingerprint generate-certs' first"; \
+		exit 1; \
+	fi
+	@echo "🧪 Running fingerprint test..."
+	@echo ""
+	@echo "⚠️  Make sure '127.0.0.1 app.kube.local admin.kube.local' is in /etc/hosts"
+	@echo ""
+	@chmod +x scripts/test-fingerprint.sh
+	@./scripts/test-fingerprint.sh
+
+clean: ## Remove test certificates and CA secret
+	@echo "🗑️  Removing test certificates..."
+	@rm -rf test-certs/
+	@echo "🗑️  Removing CA secret..."
+	@kubectl delete secret test-ca-secret -n chatbot 2>/dev/null || echo "No CA secret found"
+	@echo "✅ Test resources cleaned"

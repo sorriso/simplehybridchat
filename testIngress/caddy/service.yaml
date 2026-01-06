@@ -1,0 +1,20 @@
+# path: testIngress/caddy/service.yaml
+# version: 1.1
+# Caddy reverse proxy service
+# Changes in v1.1:
+# - Added namespace
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy-service
+  namespace: chatbot
+spec:
+  type: ClusterIP
+  selector:
+    app: caddy
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP

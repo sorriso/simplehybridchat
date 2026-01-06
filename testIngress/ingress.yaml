@@ -1,0 +1,64 @@
+# path: testIngress/ingress.yaml
+# version: 1.2
+# Test ingress for ssl_client_fingerprint validation
+# Changes in v1.2:
+# - Changed auth-tls-verify-client to "optional_no_ca" (works better than "optional")
+# - Uses $ssl_client_fingerprint (SHA1) as SHA256 is not available in v1.14.1
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chatbot-ingress-test-fingerprint
+  namespace: chatbot
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    
+    # Enable optional client certificate verification without CA validation
+    # Client can connect without certificate, but if certificate is presented, it will be captured
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "optional_no_ca"
+    nginx.ingress.kubernetes.io/auth-tls-secret: "chatbot/test-ca-secret"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
+    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "false"
+    
+    # Pass client certificate fingerprint (SHA1) to backend
+    # Note: SHA256 not available in NGINX Ingress Controller v1.14.1
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Client-Cert-Fingerprint $ssl_client_fingerprint;
+      proxy_set_header X-Client-Cert-DN $ssl_client_s_dn;
+      proxy_set_header X-Client-Cert-Verify $ssl_client_verify;
+    
+    # Proxy settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+spec:
+  tls:
+    - hosts:
+        - app.kube.local
+        - admin.kube.local
+      # Using default self-signed certificate from ingress controller
+      # secretName is optional - if omitted, ingress uses its default certificate
+  rules:
+    # Public endpoint - accessible without certificate
+    - host: app.kube.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: caddy-service
+                port:
+                  number: 3000
+    # Protected endpoint - requires whitelisted certificate fingerprint
+    - host: admin.kube.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: caddy-service
+                port:
+                  number: 3000

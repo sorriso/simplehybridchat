@@ -1,0 +1,84 @@
+# path: testIngress/caddy/configmap.yaml
+# version: 2.2
+# Caddy reverse proxy configuration
+# Changes in v2.2:
+# - Updated fingerprint format to SHA1 lowercase without colons (NGINX format)
+# - Example: 7214738db7c8dd74ba12aadd3ec47b1da0c96418
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-config
+  namespace: chatbot
+data:
+  Caddyfile: |
+    {
+        auto_https off
+    }
+    
+    # ===========================================================================
+    # Default / Fallback - Handles probes and app.kube.local traffic
+    # ===========================================================================
+    http://:3000 {
+        # Debug endpoint - shows all received headers
+        handle /debug {
+            respond "Debug Information
+
+    Headers: {http.request.header}
+
+    Client Cert Fingerprint: {http.request.header.X-Client-Cert-Fingerprint}
+    Client Cert DN: {http.request.header.X-Client-Cert-Dn}
+    Client Cert Verify: {http.request.header.X-Client-Cert-Verify}
+
+    Remote Address: {http.request.remote}
+    Host: {http.request.host}
+    URI: {http.request.uri}
+    " 200
+        }
+        
+        handle /health {
+            respond "OK" 200
+        }
+        
+        handle {
+            reverse_proxy app-service:80
+        }
+    }
+    
+    # ===========================================================================
+    # Admin services - Require whitelisted machine certificate fingerprint
+    # ===========================================================================
+    
+    http://admin.kube.local:3000 {
+        # Debug endpoint for admin
+        handle /debug {
+            respond "Admin Debug Information
+
+    Headers: {http.request.header}
+
+    Client Cert Fingerprint: {http.request.header.X-Client-Cert-Fingerprint}
+    Client Cert DN: {http.request.header.X-Client-Cert-Dn}
+    Client Cert Verify: {http.request.header.X-Client-Cert-Verify}
+
+    Remote Address: {http.request.remote}
+    Host: {http.request.host}
+    URI: {http.request.uri}
+    " 200
+        }
+
+        @allowed_fingerprints {
+            # IMPORTANT: Use SHA1 format from NGINX (lowercase, no colons)
+            # Example: 7214738db7c8dd74ba12aadd3ec47b1da0c96418
+            # To add your fingerprint, replace YOUR_FINGERPRINT_HERE below
+            header X-Client-Cert-Fingerprint "7214738db7c8dd74ba12aadd3ec47b1da0c96418"
+        }
+
+        handle @allowed_fingerprints {
+            reverse_proxy admin-service:80
+        }
+
+        handle {
+            respond "403 Forbidden - Machine not authorized
+    Fingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        }
+    }

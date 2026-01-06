@@ -1,0 +1,140 @@
+# path: testIngress/admin/configmap.yaml
+# version: 1.0
+# HTML page for admin service
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-html-config
+  namespace: chatbot
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Admin Service - Test</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                margin: 0;
+                padding: 20px;
+            }
+            .container {
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                padding: 40px;
+                max-width: 600px;
+                width: 100%;
+            }
+            h1 {
+                color: #f5576c;
+                margin-top: 0;
+                border-bottom: 3px solid #f5576c;
+                padding-bottom: 15px;
+            }
+            .status {
+                background: #fff3e0;
+                border-left: 4px solid #ff9800;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 4px;
+            }
+            .status-title {
+                font-weight: bold;
+                color: #e65100;
+                margin-bottom: 10px;
+            }
+            .info {
+                background: #f5f5f5;
+                padding: 15px;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+            .label {
+                font-weight: bold;
+                color: #555;
+                display: inline-block;
+                min-width: 150px;
+            }
+            .value {
+                color: #333;
+                font-family: 'Courier New', monospace;
+            }
+            .timestamp {
+                text-align: center;
+                color: #999;
+                font-size: 0.9em;
+                margin-top: 20px;
+            }
+            .badge {
+                display: inline-block;
+                background: #f5576c;
+                color: white;
+                padding: 5px 15px;
+                border-radius: 20px;
+                font-size: 0.85em;
+                font-weight: bold;
+            }
+            .warning {
+                background: #ffebee;
+                border: 1px solid #f44336;
+                padding: 15px;
+                border-radius: 4px;
+                margin: 15px 0;
+            }
+            .warning-title {
+                font-weight: bold;
+                color: #c62828;
+                margin-bottom: 8px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔒 Admin Service</h1>
+            
+            <div class="status">
+                <div class="status-title">⚠️ Protected Service</div>
+                <div>This is the admin service accessible at <strong>admin.kube.local</strong></div>
+            </div>
+
+            <div class="warning">
+                <div class="warning-title">🛡️ Certificate Authentication Required</div>
+                <div>Access to this service requires a whitelisted client certificate fingerprint.</div>
+            </div>
+
+            <div class="info">
+                <div><span class="label">Service Name:</span> <span class="value">admin-service</span></div>
+                <div><span class="label">Service Type:</span> <span class="value">NGINX</span></div>
+                <div><span class="label">Port:</span> <span class="value">80</span></div>
+                <div><span class="label">Namespace:</span> <span class="value">chatbot</span></div>
+            </div>
+
+            <div class="info">
+                <div><span class="label">Access Level:</span> <span class="badge">RESTRICTED</span></div>
+                <div style="margin-top: 10px; color: #666;">
+                    Only whitelisted machine certificates can access this service.
+                </div>
+            </div>
+
+            <div class="info">
+                <div style="color: #4caf50; font-weight: bold;">✅ Certificate validation successful</div>
+                <div style="margin-top: 8px; font-size: 0.9em; color: #666;">
+                    Your machine certificate fingerprint is whitelisted.
+                </div>
+            </div>
+
+            <div class="timestamp">
+                <script>document.write(new Date().toISOString())</script>
+            </div>
+        </div>
+    </body>
+    </html>

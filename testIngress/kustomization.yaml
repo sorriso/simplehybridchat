@@ -1,0 +1,27 @@
+# path: testIngress/kustomization.yaml
+# version: 1.0
+# Kustomization file for test ingress resources
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: chatbot
+
+resources:
+  # App service (public)
+  - app/configmap.yaml
+  - app/deployment.yaml
+  - app/service.yaml
+  
+  # Admin service (protected)
+  - admin/configmap.yaml
+  - admin/deployment.yaml
+  - admin/service.yaml
+  
+  # Caddy reverse proxy
+  - caddy/configmap.yaml
+  - caddy/deployment.yaml
+  - caddy/service.yaml
+  
+  # Ingress
+  - ingress.yaml
