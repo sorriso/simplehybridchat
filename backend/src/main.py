@@ -114,7 +114,11 @@ async def bootstrap_ollama():
                 
                 # Pull the model
                 await ollama.pull_model(settings.OLLAMA_MODEL)
-                
+
+                models = await ollama.list_models()
+                if settings.OLLAMA_MODEL not in models:
+                    raise Exception(f"Model {settings.OLLAMA_MODEL} failed to install")
+
                 logger.info("")
                 logger.info(f"✓ Model '{settings.OLLAMA_MODEL}' successfully pulled")
                 
