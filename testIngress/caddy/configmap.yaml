@@ -9,7 +9,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: caddy-config
-  namespace: chatbot
 data:
   Caddyfile: |
     {
@@ -70,7 +69,7 @@ data:
             # IMPORTANT: Use SHA1 format from NGINX (lowercase, no colons)
             # Example: 7214738db7c8dd74ba12aadd3ec47b1da0c96418
             # To add your fingerprint, replace YOUR_FINGERPRINT_HERE below
-            header X-Client-Cert-Fingerprint "7214738db7c8dd74ba12aadd3ec47b1da0c96418"
+            header X-Client-Cert-Fingerprint "bfa791cca7db2270e71a7f64ff59e51fbb598209"
         }
 
         handle @allowed_fingerprints {

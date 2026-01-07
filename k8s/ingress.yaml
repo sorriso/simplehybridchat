@@ -1,30 +1,22 @@
 # path: k8s/ingress.yaml
 # version: 2.0
-# Unified Nginx Ingress configuration for all services
-# Changes in v2.0:
-# - Merged ingress.yaml and ingress-admin.yaml
-# - Public service (chat.kube.local): No client certificate required
-# - Admin services (minio/n8n/arango.kube.local): Client certificate fingerprint required
-# - Uses auth-tls-verify-client: optional_no_ca (accepts any client certificate)
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: chatbot-ingress
-  namespace: chatbot
+  name: chatbot-ingress-test-fingerprint
   annotations:
     kubernetes.io/ingress.class: nginx
     
-    # Enable optional client certificate verification (no CA validation)
-    # Client can connect without certificate for public services
-    # Admin services will filter based on fingerprint whitelist in Caddy
+    # Enable optional client certificate verification without CA validation
+    # Client can connect without certificate, but if certificate is presented, it will be captured
     nginx.ingress.kubernetes.io/auth-tls-verify-client: "optional_no_ca"
     nginx.ingress.kubernetes.io/auth-tls-secret: "chatbot/client-ca-secret"
     nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
     nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "false"
     
-    # Pass client certificate fingerprint to Caddy for all services
-    # Caddy will decide which services require certificate verification
+    # Pass client certificate fingerprint (SHA1) to backend
+    # Note: SHA256 not available in NGINX Ingress Controller v1.14.1
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header X-Client-Cert-Fingerprint $ssl_client_fingerprint;
       proxy_set_header X-Client-Cert-DN $ssl_client_s_dn;
@@ -38,12 +30,8 @@ metadata:
 spec:
   tls:
     - hosts:
-        - chat.kube.local
-        - minio.kube.local
-        - n8n.kube.local
-        - arango.kube.local
-      # Using default self-signed certificate from ingress controller
-      # In production, specify secretName with real TLS certificate
+        - "*.kube.local"
+      secretName: server-tls-secret
   rules:
     # =================================================================
     # PUBLIC SERVICE - No client certificate required
@@ -66,7 +54,7 @@ spec:
     # =================================================================
     
     # MinIO Console (requires whitelisted machine certificate)
-    - host: minio.kube.local
+    - host: chat-minio.kube.local
       http:
         paths:
           - path: /
@@ -78,7 +66,7 @@ spec:
                   number: 3000
     
     # n8n Workflow Automation (requires whitelisted machine certificate)
-    - host: n8n.kube.local
+    - host: chat-n8n.kube.local
       http:
         paths:
           - path: /
@@ -90,7 +78,7 @@ spec:
                   number: 3000
     
     # ArangoDB Web UI (requires whitelisted machine certificate)
-    - host: arango.kube.local
+    - host: chat-db.kube.local
       http:
         paths:
           - path: /

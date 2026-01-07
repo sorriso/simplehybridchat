@@ -28,7 +28,7 @@ spec:
             - sh
             - -c
             - |
-              until nc -z backend 8000; do
+              until nc -z backend-service 8000; do
                 echo "Waiting for Backend...";
                 sleep 2;
               done

@@ -23,7 +23,7 @@ spec:
             - sh
             - -c
             - |
-              until nc -z backend 8000; do
+              until nc -z backend-service 8000; do
                 echo "Waiting for Backend...";
                 sleep 2;
               done
@@ -33,7 +33,7 @@ spec:
             - sh
             - -c
             - |
-              until nc -z frontend 3000; do
+              until nc -z frontend-service 3000; do
                 echo "Waiting for Frontend...";
                 sleep 2;
               done

@@ -20,7 +20,6 @@ resources:
   # ConfigMaps
   - arangodb/configmap.yaml
   - arangodb/config-init.yaml
-  - n8n/config-init.yaml
   - ollama/configmap.yaml
   - backend/configmap.yaml
   - frontend/configmap.yaml
@@ -32,10 +31,11 @@ resources:
   - n8n/secret.yaml
   - backend/secret.yaml
   - frontend/secret.yaml
-  
+  - ingress/ingress-client-ca-secret.yaml
+  - ingress/ingress-server-tls-secret.yaml
+
   # Services
   - arangodb/service.yaml
-  - arangodb/job-init.yaml
   - minio/service.yaml
   - n8n/service.yaml
   - ollama/service.yaml
@@ -43,7 +43,7 @@ resources:
   - frontend/service.yaml
   - caddy/service.yaml
   
-  # Deployments (in dependency order)
+  # Deployments
   - arangodb/deployment.yaml
   - minio/deployment.yaml
   - n8n/deployment.yaml
@@ -51,7 +51,10 @@ resources:
   - backend/deployment.yaml
   - frontend/deployment.yaml
   - caddy/deployment.yaml
-  
+
+  # Jobs
+  - n8n/job-init.yaml
+  - arangodb/job-init.yaml
+
   # Ingress (last)
   - ingress.yaml
-  - ingress-admin.yaml

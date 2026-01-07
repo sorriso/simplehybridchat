@@ -6,36 +6,36 @@
    - Backend returns {data: UserSettings} not {settings: UserSettings}
    - Matches user_settings.py v2 which returns SuccessResponse(data=...) */
 
-   import { apiClient } from "./client";
-   import { API_ENDPOINTS } from "../utils/constants";
-   import type {
-     UserSettings,
-     UpdateSettingsRequest,
-     UpdateSettingsResponse,
-   } from "@/types/settings";
-   
-   /**
-    * API functions for user settings management
-    */
-   export const settingsApi = {
-     /**
-      * Get current user settings
-      */
-     get: async (): Promise<UserSettings> => {
-       const response = await apiClient.get<{ data: UserSettings }>(
-         API_ENDPOINTS.SETTINGS,
-       );
-       return response.data;
-     },
-   
-     /**
-      * Update user settings
-      */
-     update: async (data: UpdateSettingsRequest): Promise<UserSettings> => {
-       const response = await apiClient.put<{ data: UserSettings }>(
-         API_ENDPOINTS.SETTINGS,
-         data,
-       );
-       return response.data;
-     },
-   };
+import { apiClient } from "./client";
+import { API_ENDPOINTS } from "../utils/constants";
+import type {
+  UserSettings,
+  UpdateSettingsRequest,
+  UpdateSettingsResponse,
+} from "@/types/settings";
+
+/**
+ * API functions for user settings management
+ */
+export const settingsApi = {
+  /**
+   * Get current user settings
+   */
+  get: async (): Promise<UserSettings> => {
+    const response = await apiClient.get<{ data: UserSettings }>(
+      API_ENDPOINTS.SETTINGS,
+    );
+    return response.data;
+  },
+
+  /**
+   * Update user settings
+   */
+  update: async (data: UpdateSettingsRequest): Promise<UserSettings> => {
+    const response = await apiClient.put<{ data: UserSettings }>(
+      API_ENDPOINTS.SETTINGS,
+      data,
+    );
+    return response.data;
+  },
+};
