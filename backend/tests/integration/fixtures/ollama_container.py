@@ -1,6 +1,16 @@
 """
 Path: backend/tests/integration/fixtures/ollama_container.py
-Version: 19
+Version: 24
+
+Changes in v24:
+- CRITICAL FIX: Decode bytes to str before string comparison
+- Back to ollama CLI (curl not available in ollama image)
+- Uses native ollama pull + ollama list commands
+- Ephemeral storage avoids volume/persistence issues
+
+Changes in v23:
+- Attempted curl approach but curl not available in ollama image
+- Installation failed (no apt-get/apk in minimal image)
 """
 
 import pytest
@@ -159,16 +169,43 @@ class OllamaContainer(DockerContainer):
         return f"http://{container_ip}:{self.port}"
     
     def pull_model(self) -> None:
-        """Pull the specified model using ollama CLI inside container"""
-        logger.info(f"Pulling model {self.model} in Ollama container...")
+        """
+        Pull the specified model using ollama CLI inside container
+        
+        Uses exec to run 'ollama pull' inside the container.
+        The ollama CLI is guaranteed to be available in the ollama image.
+        Ephemeral storage (no volume) avoids digest mismatch issues.
+        """
+        import time
+        
+        logger.info(f"Pulling model {self.model} via ollama CLI...")
         
         try:
-            # Use docker exec to pull model inside container
+            # Use ollama pull command (guaranteed to be available)
             result = self.exec(f"ollama pull {self.model}")
             
+            # Decode output if bytes
+            output = result.output.decode('utf-8') if isinstance(result.output, bytes) else result.output
+            
             if result.exit_code != 0:
-                logger.error(f"Failed to pull model: {result.output}")
+                logger.error(f"Pull failed with exit code {result.exit_code}")
+                logger.error(f"Output: {output}")
                 raise Exception(f"Model pull failed with exit code {result.exit_code}")
+            
+            logger.info("Pull completed, waiting for model to finalize...")
+            time.sleep(3)  # Give Ollama time to finalize
+            
+            # Verify model is available
+            result = self.exec("ollama list")
+            output = result.output.decode('utf-8') if isinstance(result.output, bytes) else result.output
+            
+            if result.exit_code == 0 and self.model in output:
+                logger.info(f"✓ Model {self.model} verified in model list")
+                logger.debug(f"Available models:\n{output}")
+            else:
+                logger.warning(f"⚠ Model {self.model} not found after pull")
+                logger.warning(f"ollama list output: {output}")
+                raise Exception(f"Model {self.model} not found after pull")
             
             logger.info(f"Model {self.model} pulled successfully")
             
@@ -207,7 +244,11 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     print(f"   From host:       {host_url}", flush=True)
     print(f"   From containers: {internal_url}\n", flush=True)
     
-    # Pull model once for all tests
+    # Additional wait after ready check for stability
+    logger.info("Waiting 5s for Ollama to fully stabilize...")
+    time.sleep(5)
+    
+    # Pull model once for all tests (using ollama CLI)
     container.pull_model()
     
     logger.info("Ollama container ready (session scope)")
@@ -244,58 +285,8 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
         logger.warning(f"⚠ Could not test Ollama connection: {e}")
         print(f"⚠ Connection test error: {e}\n", flush=True)
     
-    # =============================================================================
-    # MANUAL TESTING PAUSE - Comment out after testing
-    # =============================================================================
-    # Get real container info
-    wrapped_container = container.get_wrapped_container()
-    container_id = wrapped_container.id[:12]
-    
-    # Get URLs
-    host_url = container.get_connection_url()  # For testing from host
-    internal_url = container.get_internal_url()  # For app-to-ollama communication
-    
-    # Parse internal URL for display
-    container_ip = container.get_container_ip()
-    host = container.get_container_host_ip()
-    mapped_port = container.get_exposed_port(container.port)
-    
-    print("\n" + "="*80, flush=True)
-    print("🎯 OLLAMA READY FOR MANUAL TESTING", flush=True)
-    print("="*80, flush=True)
-    print(f"Container ID:     {container_id}", flush=True)
-    print(f"Container IP:     {container_ip} (internal Docker network)", flush=True)
-    print(f"Internal Port:    {container.port}", flush=True)
-    print("", flush=True)
-    print(f"URL for tests from HOST:", flush=True)
-    print(f"  {host_url}", flush=True)
-    print("", flush=True)
-    print(f"URL for app (container-to-container):", flush=True)
-    print(f"  {internal_url} ← USED BY TESTS", flush=True)
-    print("", flush=True)
-    print(f"Model: tinyllama", flush=True)
-    print("", flush=True)
-    print("Test commands (from host):", flush=True)
-    print(f"  curl {host_url}/api/tags", flush=True)
-    print(f"  curl {host_url}/api/generate -d '{{\"model\": \"tinyllama\", \"prompt\": \"Hello\", \"stream\": false}}'", flush=True)
-    print("", flush=True)
-    print(f"Test from inside container:", flush=True)
-    print(f"  docker exec {container_id} ollama ps", flush=True)
-    print(f"  docker exec {container_id} ollama list", flush=True)
-    print("", flush=True)
-    print(f"Interactive mode:", flush=True)
-    print(f"  docker exec -it {container_id} ollama run tinyllama", flush=True)
-    print("", flush=True)
-    print("⏸️  PAUSING FOR 10 MINUTES (600s)...", flush=True)
-    print("   Press Ctrl+C to skip and continue with tests", flush=True)
-    print("="*80 + "\n", flush=True)
-    
-    #time.sleep(600)  # ⚠️ COMMENT THIS LINE AFTER MANUAL TESTING
-    
-    print("\n" + "="*80, flush=True)
-    print("▶️  CONTINUING WITH TESTS...", flush=True)
-    print("="*80 + "\n", flush=True)
-    # =============================================================================
+    # Ready for tests
+    logger.info("Ollama container ready for tests (session scope)")
     
     yield container
     

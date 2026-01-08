@@ -26,7 +26,7 @@ class SettingsService:
     
     # Default settings values
     DEFAULT_SETTINGS = {
-        "prompt_customization": "",
+        "prompt_customization": "Your are an AI expert,\nDo not lie,\nDo not invent,\nDo not cheat,\nIf additional information are missing then ask for them,\nIf you do not know then just say it and ask for help,\nDo not generate additional data (documentation, explanation) except if I request explicitly them,\nRespond in a clear, structured, straightforward and professional way",
         "theme": "light",
         "language": "en"
     }

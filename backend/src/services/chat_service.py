@@ -1,22 +1,20 @@
 """
 Path: backend/src/services/chat_service.py
-Version: 5
+Version: 6
+
+Changes in v6:
+- Store COMPLETE context in llm_full_prompt as structured JSON:
+  - system: system prompt with user preferences
+  - context: conversation history messages sent to LLM
+  - current_message: the user's current message
+- Enables full traceability of what was sent to LLM
+- Prepares for RAG integration (will be added to system or context)
 
 Changes in v5:
 - Store LLM metadata in messages:
   - llm_full_prompt: Complete system prompt with preferences/RAG context
   - llm_raw_response: Full raw response from LLM
   - llm_stats: Generation statistics (tokens, duration, tokens/sec)
-- User messages store the full prompt that will be used
-- Assistant messages store raw response and stats from LLM
-- Data stored in DB but not exposed in API responses yet
-
-Changes in v4:
-- Add SettingsService to retrieve user prompt_customization from database
-- Retrieve user settings in stream_chat() to get stored prompt_customization
-- Combine DB prompt_customization with request prompt_customization
-- Request prompt_customization takes priority if both provided
-- Pass combined prompt to _get_system_prompt()
 
 Chat streaming service
 Handles chat streaming with conversation context and message persistence
@@ -225,21 +223,28 @@ class ChatService:
         # 5. Build system prompt with combined customization
         system_prompt = self._get_system_prompt(combined_prompt)
         
-        # 3. Save user message with full prompt for traceability
+        # 4. Build context
+        context = self._build_conversation_context(conversation_id)
+        
+        # Build complete prompt context for traceability
+        llm_full_context = {
+            "system": system_prompt,
+            "context": context,  # Conversation history
+            "current_message": message
+        }
+        
+        # 3. Save user message with complete context
         user_message = {
             "conversation_id": conversation_id,
             "role": "user",
             "content": message,
             "created_at": datetime.utcnow(),
-            "llm_full_prompt": system_prompt  # Store full prompt used for this request
+            "llm_full_prompt": llm_full_context  # Store complete context as JSON
         }
         user_msg_doc = self.message_repo.create(user_message)
         logger.info(f"Saved user message: {user_msg_doc['id']}")
         
-        # 4. Build context
-        context = self._build_conversation_context(conversation_id)
-        
-        # Add current message to context
+        # Add current message to context for LLM call
         context.append({"role": "user", "content": message})
         
         # 6. Stream from LLM and accumulate response
@@ -273,7 +278,7 @@ class ChatService:
             "role": "assistant",
             "content": assistant_content,
             "created_at": datetime.utcnow(),
-            "llm_full_prompt": system_prompt,  # Same prompt used for generation
+            "llm_full_prompt": llm_full_context,  # Same complete context used for generation
             "llm_raw_response": assistant_content,  # Store raw response
             "llm_stats": llm_stats  # Store generation statistics
         }
