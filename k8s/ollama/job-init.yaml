@@ -1,0 +1,117 @@
+# path: k8s/ollama/job-pull-model.yaml
+# version: 1.0
+# Job to pull tinyllama model into Ollama service
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-pull-tinyllama
+spec:
+  # Don't automatically delete completed job (for debugging)
+  # ttlSecondsAfterFinished: 100
+  
+  backoffLimit: 3
+  
+  template:
+    metadata:
+      labels:
+        app: ollama-init
+    spec:
+      restartPolicy: OnFailure
+      
+      # Wait for Ollama service to be ready
+      initContainers:
+        - name: wait-for-ollama
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Ollama service to be ready..."
+              until nc -z ollama-service 11434; do
+                echo "Ollama not ready yet, waiting...";
+                sleep 2;
+              done
+              echo "Ollama service is ready!"
+              
+              # Additional wait for Ollama to fully initialize
+              sleep 5
+      
+      containers:
+        - name: pull-model
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "=========================================="
+              echo "PULLING TINYLLAMA MODEL"
+              echo "=========================================="
+              echo "Target: http://ollama-service:11434"
+              echo ""
+              
+              # Pull tinyllama using Ollama API
+              echo "Starting pull request..."
+              curl -X POST http://ollama-service:11434/api/pull \
+                -H "Content-Type: application/json" \
+                -d '{"name": "tinyllama", "stream": true}' \
+                -w "\nHTTP Status: %{http_code}\n" \
+                --fail-with-body \
+                --max-time 300
+              
+              PULL_STATUS=$?
+              echo ""
+              
+              if [ $PULL_STATUS -eq 0 ]; then
+                echo "Pull request completed successfully"
+                echo ""
+                
+                # Wait a bit for Ollama to finalize
+                echo "Waiting 3 seconds for Ollama to finalize..."
+                sleep 3
+                
+                # Verify model is available
+                echo "Verifying model installation..."
+                MODELS=$(curl -s http://ollama-service:11434/api/tags)
+                echo "Available models: $MODELS"
+                
+                if echo "$MODELS" | grep -q "tinyllama"; then
+                  echo ""
+                  echo "=========================================="
+                  echo "✓ SUCCESS: tinyllama model is ready"
+                  echo "=========================================="
+                  exit 0
+                else
+                  echo ""
+                  echo "=========================================="
+                  echo "✗ ERROR: tinyllama not found after pull"
+                  echo "=========================================="
+                  echo "This may indicate:"
+                  echo "  1. Ollama pod restarted during pull"
+                  echo "  2. Storage/persistence issue"
+                  echo "  3. Digest mismatch error"
+                  echo ""
+                  echo "Check Ollama pod logs for details"
+                  exit 1
+                fi
+              else
+                echo ""
+                echo "=========================================="
+                echo "✗ ERROR: Pull request failed"
+                echo "=========================================="
+                echo "HTTP request returned status: $PULL_STATUS"
+                echo ""
+                echo "Possible causes:"
+                echo "  1. Network connectivity to ollama-service"
+                echo "  2. Ollama server not responding"
+                echo "  3. Model name incorrect"
+                exit 1
+              fi
+          
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"

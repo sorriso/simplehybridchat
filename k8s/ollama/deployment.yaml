@@ -24,10 +24,6 @@ spec:
             - containerPort: 11434
               name: http
 
-          volumeMounts:
-            - name: ollama-data
-              mountPath: /root/.ollama
-
           resources:
             requests:
               memory: "2Gi"
@@ -49,8 +45,3 @@ spec:
               port: 11434
             initialDelaySeconds: 10
             periodSeconds: 5
-            
-      volumes:
-        - name: ollama-data
-          persistentVolumeClaim:
-            claimName: ollama-pvc

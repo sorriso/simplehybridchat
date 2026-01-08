@@ -66,3 +66,75 @@ data:
     Fingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
         }
     }
+
+
+
+    http://chat-n8n.kube.local:3000 {
+        # Debug endpoint for admin
+        handle /debug {
+            respond "Admin Debug Information
+
+    Headers: {http.request.header}
+
+    Client Cert Fingerprint: {http.request.header.X-Client-Cert-Fingerprint}
+    Client Cert DN: {http.request.header.X-Client-Cert-Dn}
+    Client Cert Verify: {http.request.header.X-Client-Cert-Verify}
+
+    Remote Address: {http.request.remote}
+    Host: {http.request.host}
+    URI: {http.request.uri}
+    " 200
+        }
+
+        @allowed_fingerprints {
+            # IMPORTANT: Use SHA1 format from NGINX (lowercase, no colons)
+            # Example: 7214738db7c8dd74ba12aadd3ec47b1da0c96418
+            # To add your fingerprint, replace YOUR_FINGERPRINT_HERE below
+            header X-Client-Cert-Fingerprint "bfa791cca7db2270e71a7f64ff59e51fbb598209"
+        }
+
+        handle @allowed_fingerprints {
+            reverse_proxy n8n-service:5678
+        }
+
+        handle {
+            respond "403 Forbidden - Machine not authorized
+    Fingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        }
+    }
+
+
+
+    http://chat-db.kube.local:3000 {
+        # Debug endpoint for admin
+        handle /debug {
+            respond "Admin Debug Information
+
+    Headers: {http.request.header}
+
+    Client Cert Fingerprint: {http.request.header.X-Client-Cert-Fingerprint}
+    Client Cert DN: {http.request.header.X-Client-Cert-Dn}
+    Client Cert Verify: {http.request.header.X-Client-Cert-Verify}
+
+    Remote Address: {http.request.remote}
+    Host: {http.request.host}
+    URI: {http.request.uri}
+    " 200
+        }
+
+        @allowed_fingerprints {
+            # IMPORTANT: Use SHA1 format from NGINX (lowercase, no colons)
+            # Example: 7214738db7c8dd74ba12aadd3ec47b1da0c96418
+            # To add your fingerprint, replace YOUR_FINGERPRINT_HERE below
+            header X-Client-Cert-Fingerprint "bfa791cca7db2270e71a7f64ff59e51fbb598209"
+        }
+
+        handle @allowed_fingerprints {
+            reverse_proxy arangodb-service:8529
+        }
+
+        handle {
+            respond "403 Forbidden - Machine not authorized
+    Fingerprint: {http.request.header.X-Client-Cert-Fingerprint}" 403
+        }
+    }

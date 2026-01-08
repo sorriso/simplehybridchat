@@ -103,6 +103,9 @@ class TestConversationServiceRead:
     
     def test_get_conversation_with_shared_access(self, conversation_service, mock_db, current_user):
         """Test getting conversation with shared access"""
+        # Mock user_repo to return current_user with group_ids
+        conversation_service.user_repo.get_by_id = Mock(return_value=current_user)
+        
         conv = mock_db.create("conversations", {
             "title": "Shared Conv",
             "owner_id": "user-other",
@@ -115,6 +118,7 @@ class TestConversationServiceRead:
         result = conversation_service.get_conversation(conv["id"], current_user)
         
         assert result.id == conv["id"]
+        assert result.is_shared is True
     
     def test_get_conversation_access_denied(self, conversation_service, mock_db, current_user):
         """Test getting conversation without access"""
@@ -174,6 +178,9 @@ class TestConversationServiceRead:
     
     def test_list_shared_conversations(self, conversation_service, mock_db, current_user):
         """Test listing conversations shared with user"""
+        # Mock user_repo to return current_user with group_ids
+        conversation_service.user_repo.get_by_id = Mock(return_value=current_user)
+        
         mock_db.create("conversations", {
             "title": "Shared Conv 1",
             "owner_id": "user-other",

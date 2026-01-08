@@ -128,13 +128,25 @@ class TestUserGroupService:
         mock_group_repo.get_by_manager.assert_called_once_with("manager-1")
     
     @pytest.mark.unit
-    def test_list_groups_as_user_forbidden(self, service, regular_user):
-        """Test regular user cannot list groups"""
-        with pytest.raises(HTTPException) as exc_info:
-            service.list_groups(regular_user)
+    def test_list_groups_as_user(self, service, mock_user_repo, mock_group_repo, regular_user):
+        """Test regular user sees only their own groups"""
+        # Mock user_repo to return user with group_ids
+        mock_user_repo.get_by_id.return_value = {
+            **regular_user,
+            "group_ids": ["group-1", "group-2"]
+        }
         
-        assert exc_info.value.status_code == 403
-        assert "Manager or root permission required" in str(exc_info.value.detail)
+        # Mock group_repo to return groups
+        mock_group_repo.get_by_id.side_effect = [
+            {"id": "group-1", "name": "Team 1", "status": "active"},
+            {"id": "group-2", "name": "Team 2", "status": "active"}
+        ]
+        
+        groups = service.list_groups(regular_user)
+        
+        assert len(groups) == 2
+        assert groups[0]["id"] == "group-1"
+        assert groups[1]["id"] == "group-2"
     
     @pytest.mark.unit
     def test_list_groups_returns_empty_list(self, service, mock_group_repo, root_user):
@@ -294,7 +306,14 @@ class TestUserGroupService:
     def test_add_member(self, service, mock_group_repo, mock_user_repo, root_user, sample_group):
         """Test adding member to group"""
         mock_group_repo.get_by_id.return_value = sample_group
-        mock_user_repo.get_by_id.return_value = {"id": "user-3", "name": "New User"}
+        
+        # Mock user_repo to return user with existing group_ids
+        mock_user_repo.get_by_id.return_value = {
+            "id": "user-3",
+            "name": "New User",
+            "group_ids": ["group-5"]  # User already in another group
+        }
+        
         mock_group_repo.add_member.return_value = {
             **sample_group,
             "member_ids": ["user-1", "user-2", "user-3"]
@@ -304,6 +323,10 @@ class TestUserGroupService:
         
         assert "user-3" in updated["member_ids"]
         mock_group_repo.add_member.assert_called_once_with("group-1", "user-3")
+        
+        # Verify user's group_ids were updated (bidirectional)
+        mock_user_repo.update.assert_called_once_with("user-3", {"group_ids": ["group-5", "group-1"]})
+    
     
     @pytest.mark.unit
     def test_add_member_user_not_found(self, service, mock_group_repo, mock_user_repo, root_user, sample_group):
@@ -318,9 +341,17 @@ class TestUserGroupService:
         assert "User not found" in str(exc_info.value.detail)
     
     @pytest.mark.unit
-    def test_remove_member(self, service, mock_group_repo, root_user, sample_group):
+    def test_remove_member(self, service, mock_group_repo, mock_user_repo, root_user, sample_group):
         """Test removing member from group"""
         mock_group_repo.get_by_id.return_value = sample_group
+        
+        # Mock user_repo to return user with group_ids
+        mock_user_repo.get_by_id.return_value = {
+            "id": "user-1",
+            "name": "User 1",
+            "group_ids": ["group-1", "group-2"]
+        }
+        
         mock_group_repo.remove_member.return_value = {
             **sample_group,
             "member_ids": ["user-2"]
@@ -330,6 +361,9 @@ class TestUserGroupService:
         
         assert "user-1" not in updated["member_ids"]
         mock_group_repo.remove_member.assert_called_once_with("group-1", "user-1")
+        
+        # Verify user's group_ids were updated (bidirectional)
+        mock_user_repo.update.assert_called_once_with("user-1", {"group_ids": ["group-2"]})
     
     # Manager Assignment Tests
     

@@ -1,6 +1,11 @@
 """
 Path: backend/tests/integration/api/test_user_settings_routes_integration.py
-Version: 1.4
+Version: 1.5
+
+Changes in v1.5:
+- FIX: Store settings with user_id field instead of _key
+- SettingsRepository searches by user_id, not _key
+- Fixes test_get_settings_returns_stored_settings (was returning empty string)
 
 Changes in v1.4:
 - FIX: Fixed last remaining direct access at line 200
@@ -93,9 +98,10 @@ class TestGetSettings:
         """Test getting settings returns stored values"""
         db = arango_container_function
         
-        # Store settings
+        # Store settings with user_id field (not _key)
+        # SettingsRepository searches by user_id, not _key
         db.create("settings", {
-            "_key": test_user["id"],
+            "user_id": test_user["id"],
             "prompt_customization": "Custom prompt",
             "theme": "light",
             "language": "fr"

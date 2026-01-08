@@ -2,18 +2,18 @@
 # Path: backend/requirements.txt
 # Version: 3
 
-fastapi==0.122.0
-uvicorn[standard]==0.38.0
+fastapi==0.128.0                    #0.122.0
+uvicorn[standard]==0.40.0           #0.38.0
 pydantic==2.12.5
 pydantic-settings==2.12.0
 typing-extensions==4.15.0
-python-arango==8.2.3
+python-arango==8.2.5                #8.2.3
 minio==7.2.20
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-python-multipart==0.0.20
+python-multipart==0.0.21            #0.0.20
 httpx==0.28.1
 aiofiles==25.1.0
-openai==2.8.1
+openai==2.14.0                      #2.8.1
 email-validator==2.3.0

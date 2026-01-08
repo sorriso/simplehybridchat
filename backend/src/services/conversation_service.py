@@ -228,13 +228,9 @@ class ConversationService:
                 detail="Only owner can update conversation"
             )
         
-        # Build update dict from non-None fields
-        update_data = {}
-        if data.title is not None:
-            update_data["title"] = data.title
-        if data.group_id is not None:
-            update_data["group_id"] = data.group_id
-        
+        # Build update dict from explicitly set fields
+        # Use model_dump(exclude_unset=True) to distinguish None from "not provided"
+        update_data = data.model_dump(exclude_unset=True)
         update_data["updated_at"] = datetime.utcnow()
         
         updated_conv = self.conversation_repo.update(conversation_id, update_data)
@@ -249,7 +245,7 @@ class ConversationService:
         self,
         conversation_id: str,
         current_user: Dict[str, Any]
-    ) -> None:
+    ) -> bool:
         """
         Delete conversation
         
@@ -258,6 +254,9 @@ class ConversationService:
         Args:
             conversation_id: Conversation ID
             current_user: Current user dict
+            
+        Returns:
+            True if deleted
             
         Raises:
             HTTPException 404: If conversation not found
@@ -279,7 +278,7 @@ class ConversationService:
                 detail="Only owner can delete conversation"
             )
         
-        self.conversation_repo.delete(conversation_id)
+        return self.conversation_repo.delete(conversation_id)
     
     # ========================================================================
     # Sharing

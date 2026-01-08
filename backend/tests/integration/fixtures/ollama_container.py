@@ -1,21 +1,6 @@
 """
 Path: backend/tests/integration/fixtures/ollama_container.py
-Version: 10
-
-Changes in v10:
-- Commented out 600s pause (was blocking all tests)
-- Reduced timeout to 30s for tests (from 300s)
-- Added connection test after model pull
-- Added logging to ollama_config
-
-Changes in v9:
-- Added get_container_ip() to get container's internal IP using docker inspect
-- Added get_internal_url() to get URL for container-to-container communication
-- Updated ollama_config to use internal URL (fixes 404 errors)
-- Display both host URL and internal URL in pause message
-
-Ollama testcontainer fixture for integration tests
-Provides local LLM for testing without external API dependencies
+Version: 19
 """
 
 import pytest
@@ -52,6 +37,10 @@ class OllamaContainer(DockerContainer):
         self.model = model
         self.port = 11434
         
+        # Start Ollama server explicitly
+        # Image has ENTRYPOINT ["ollama"], so just pass "serve" as arg
+        self.with_command("serve")
+        
         # Expose Ollama API port
         self.with_exposed_ports(self.port)
     
@@ -59,11 +48,60 @@ class OllamaContainer(DockerContainer):
         """Start container and wait for Ollama to be ready"""
         super().start()
         
-        # Wait for Ollama to be ready
+        # Wait for Ollama API to be ready
         logger.info("Waiting for Ollama to start...")
-        time.sleep(10)  # Increased to 10s to ensure Ollama is fully ready
+        self.wait_until_ready()
         
         return self
+    
+    def wait_until_ready(self, timeout: int = 60):
+        """
+        Wait until Ollama API is responding
+        
+        Checks from inside the container using exec.
+        Polls /api/tags endpoint until success or timeout.
+        
+        Args:
+            timeout: Maximum seconds to wait (default: 60)
+            
+        Raises:
+            TimeoutError: If Ollama doesn't respond within timeout
+        """
+        import time
+        
+        start_time = time.time()
+        attempt = 0
+        
+        logger.info("Waiting for Ollama to be ready...")
+        
+        while time.time() - start_time < timeout:
+            attempt += 1
+            elapsed = time.time() - start_time
+            
+            try:
+                # Use ollama ps to check if server is responding
+                # This is the most reliable way since ollama CLI is guaranteed to be present
+                result = self.exec("ollama ps")
+                
+                logger.debug(f"Attempt {attempt} ({elapsed:.1f}s): exit_code={result.exit_code}")
+                
+                if result.exit_code == 0:
+                    logger.info(f"✓ Ollama API ready after {elapsed:.1f}s")
+                    return
+                
+                # Log output for debugging
+                if result.output:
+                    logger.debug(f"  Output: {result.output[:100]}")
+                    
+            except Exception as e:
+                logger.debug(f"Attempt {attempt} ({elapsed:.1f}s): Exception: {e}")
+            
+            time.sleep(2)
+        
+        logger.error(f"✗ Ollama did not become ready within {timeout}s")
+        logger.error(f"  Total attempts: {attempt}")
+        
+        raise TimeoutError(f"Ollama did not become ready within {timeout}s after {attempt} attempts")
     
     def get_connection_url(self) -> str:
         """Get Ollama API URL"""
@@ -139,6 +177,7 @@ class OllamaContainer(DockerContainer):
             raise
 
 
+
 @pytest.fixture(scope="session")
 def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     """
@@ -164,7 +203,7 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     logger.info("Ollama container started and ready")
     logger.info(f"Host URL: {host_url}")
     logger.info(f"Internal URL: {internal_url}")
-    print(f"\nðŸ”— Ollama URLs:", flush=True)
+    print(f"\n🔗 Ollama URLs:", flush=True)
     print(f"   From host:       {host_url}", flush=True)
     print(f"   From containers: {internal_url}\n", flush=True)
     
@@ -194,16 +233,16 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
         )
         
         if result.returncode == 0 and "tinyllama" in result.stdout:
-            logger.info("âœ“ Ollama connection test PASSED")
-            print(f"âœ“ Ollama connection test PASSED - {internal_url}\n", flush=True)
+            logger.info("✓ Ollama connection test PASSED")
+            print(f"✓ Ollama connection test PASSED - {internal_url}\n", flush=True)
         else:
-            logger.warning(f"âš  Ollama connection test FAILED: {result.stderr}")
-            print(f"âš  Ollama might not be accessible at {internal_url}\n", flush=True)
+            logger.warning(f"⚠ Ollama connection test FAILED: {result.stderr}")
+            print(f"⚠ Ollama might not be accessible at {internal_url}\n", flush=True)
             print(f"   Error: {result.stderr}\n", flush=True)
     
     except Exception as e:
-        logger.warning(f"âš  Could not test Ollama connection: {e}")
-        print(f"âš  Connection test error: {e}\n", flush=True)
+        logger.warning(f"⚠ Could not test Ollama connection: {e}")
+        print(f"⚠ Connection test error: {e}\n", flush=True)
     
     # =============================================================================
     # MANUAL TESTING PAUSE - Comment out after testing
@@ -222,7 +261,7 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     mapped_port = container.get_exposed_port(container.port)
     
     print("\n" + "="*80, flush=True)
-    print("ðŸŽ¯ OLLAMA READY FOR MANUAL TESTING", flush=True)
+    print("🎯 OLLAMA READY FOR MANUAL TESTING", flush=True)
     print("="*80, flush=True)
     print(f"Container ID:     {container_id}", flush=True)
     print(f"Container IP:     {container_ip} (internal Docker network)", flush=True)
@@ -232,7 +271,7 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     print(f"  {host_url}", flush=True)
     print("", flush=True)
     print(f"URL for app (container-to-container):", flush=True)
-    print(f"  {internal_url} â† USED BY TESTS", flush=True)
+    print(f"  {internal_url} ← USED BY TESTS", flush=True)
     print("", flush=True)
     print(f"Model: tinyllama", flush=True)
     print("", flush=True)
@@ -240,17 +279,21 @@ def ollama_container_session() -> Generator[OllamaContainer, None, None]:
     print(f"  curl {host_url}/api/tags", flush=True)
     print(f"  curl {host_url}/api/generate -d '{{\"model\": \"tinyllama\", \"prompt\": \"Hello\", \"stream\": false}}'", flush=True)
     print("", flush=True)
+    print(f"Test from inside container:", flush=True)
+    print(f"  docker exec {container_id} ollama ps", flush=True)
+    print(f"  docker exec {container_id} ollama list", flush=True)
+    print("", flush=True)
     print(f"Interactive mode:", flush=True)
     print(f"  docker exec -it {container_id} ollama run tinyllama", flush=True)
     print("", flush=True)
-    print("â¸ï¸  PAUSING FOR 10 MINUTES (600s)...", flush=True)
+    print("⏸️  PAUSING FOR 10 MINUTES (600s)...", flush=True)
     print("   Press Ctrl+C to skip and continue with tests", flush=True)
     print("="*80 + "\n", flush=True)
     
-    #time.sleep(600)  # âš ï¸ COMMENT THIS LINE AFTER MANUAL TESTING
+    #time.sleep(600)  # ⚠️ COMMENT THIS LINE AFTER MANUAL TESTING
     
     print("\n" + "="*80, flush=True)
-    print("â–¶ï¸  CONTINUING WITH TESTS...", flush=True)
+    print("▶️  CONTINUING WITH TESTS...", flush=True)
     print("="*80 + "\n", flush=True)
     # =============================================================================
     

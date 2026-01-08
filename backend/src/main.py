@@ -1,26 +1,6 @@
 """
 Path: backend/src/main.py
-Version: 17
-
-Changes in v16:
-- FIX: Bootstrap checks for ANY root user (not by email)
-- FIX: Updates existing root email if .env email differs
-- Prevents duplicate root users when ROOT_USER_EMAIL changes in .env
-- Pattern: Find root by role, update email if needed, create only if no root exists
-
-Changes in v15:
-- CRITICAL FIX: Added bootstrap_ollama() function for automatic model pull
-- Ollama model is now automatically downloaded on first startup
-- Idempotent: checks if model exists before pulling
-- Independent of deployment method (Docker, Kubernetes, etc.)
-- Startup event now calls: bootstrap_database() then bootstrap_ollama()
-
-Changes in v14:
-- CRITICAL FIX: Use settings.ROOT_USER_EMAIL/PASSWORD/NAME instead of os.getenv()
-- This ensures .env values are properly read via pydantic Settings
-- Removed hardcoded "root@localhost" default
-
-FastAPI application entry point with automatic database bootstrap
+Version: 18
 """
 
 import logging
@@ -58,96 +38,6 @@ try:
     ADMIN_AVAILABLE = True
 except ImportError:
     ADMIN_AVAILABLE = False
-
-
-async def bootstrap_ollama():
-    """
-    Bootstrap Ollama by ensuring the configured model is available
-    
-    Steps:
-    1. Connect to Ollama server
-    2. Check if model exists
-    3. Pull model if not found
-    
-    Safe to run multiple times (idempotent).
-    Only pulls model if it doesn't exist.
-    """
-    # Only bootstrap if using Ollama
-    if settings.LLM_PROVIDER != "ollama":
-        logger.info("Skipping Ollama bootstrap (LLM_PROVIDER != ollama)")
-        return
-    
-    try:
-        logger.info("")
-        logger.info("=" * 80)
-        logger.info("OLLAMA MODEL INITIALIZATION")
-        logger.info("=" * 80)
-        logger.info(f"Server: {settings.OLLAMA_BASE_URL}")
-        logger.info(f"Model: {settings.OLLAMA_MODEL}")
-        logger.info("")
-        
-        # Import Ollama adapter
-        from src.llm.adapters.ollama_adapter import OllamaAdapter
-        
-        # Create temporary instance for bootstrap
-        ollama = OllamaAdapter()
-        ollama.connect()
-        
-        logger.info("[1/2] Checking if model exists...")
-        
-        # List available models
-        try:
-            models = await ollama.list_models()
-            model_exists = any(
-                settings.OLLAMA_MODEL in model 
-                for model in models
-            )
-            
-            if model_exists:
-                logger.info(f"✓ Model '{settings.OLLAMA_MODEL}' already available")
-                logger.info("Skipping download")
-            else:
-                logger.info(f"✗ Model '{settings.OLLAMA_MODEL}' not found")
-                logger.info("")
-                logger.info("[2/2] Pulling model (this may take 30-60 seconds)...")
-                logger.info("")
-                
-                # Pull the model
-                await ollama.pull_model(settings.OLLAMA_MODEL)
-
-                models = await ollama.list_models()
-                if settings.OLLAMA_MODEL not in models:
-                    raise Exception(f"Model {settings.OLLAMA_MODEL} failed to install")
-
-                logger.info("")
-                logger.info(f"✓ Model '{settings.OLLAMA_MODEL}' successfully pulled")
-                
-        except Exception as e:
-            logger.warning(f"Failed to check/pull Ollama model: {e}")
-            logger.warning("Application will continue, but chat may not work until model is available")
-            logger.warning(f"Manual pull: docker exec <container> ollama pull {settings.OLLAMA_MODEL}")
-        
-        # Close the client
-        if ollama.client:
-            await ollama.client.aclose()
-        
-        logger.info("=" * 80)
-        logger.info("OLLAMA INITIALIZATION COMPLETE")
-        logger.info("=" * 80)
-        logger.info("")
-        
-    except Exception as e:
-        logger.error("=" * 80)
-        logger.error("OLLAMA BOOTSTRAP ERROR")
-        logger.error("=" * 80)
-        logger.error(f"Error: {e}")
-        logger.error("")
-        logger.error("Possible causes:")
-        logger.error(f"  1. Ollama is not running ({settings.OLLAMA_BASE_URL})")
-        logger.error("  2. Network connectivity to Ollama server")
-        logger.error("  3. Ollama service not healthy")
-        logger.error("=" * 80)
-        logger.warning("Application will continue, but chat may not work")
 
 
 def bootstrap_database():
@@ -476,9 +366,6 @@ async def startup_event():
     
     # Run database bootstrap
     bootstrap_database()
-    
-    # Run Ollama bootstrap (if using Ollama)
-    await bootstrap_ollama()
     
     logger.info("")
     logger.info("=" * 80)

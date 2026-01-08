@@ -1,16 +1,22 @@
 """
 Path: backend/src/services/chat_service.py
-Version: 3
+Version: 5
 
-Changes in v3:
-- Add validate_conversation_access() public method
-- Call this before streaming to raise HTTP exceptions early (before SSE starts)
-- Fixes issue where 404/403 were caught in stream generator and returned as 200
+Changes in v5:
+- Store LLM metadata in messages:
+  - llm_full_prompt: Complete system prompt with preferences/RAG context
+  - llm_raw_response: Full raw response from LLM
+  - llm_stats: Generation statistics (tokens, duration, tokens/sec)
+- User messages store the full prompt that will be used
+- Assistant messages store raw response and stats from LLM
+- Data stored in DB but not exposed in API responses yet
 
-Changes in v2:
-- Lazy-load LLM via @property instead of in __init__
-- This allows ChatService to be imported without LLM being configured
-- LLM is only initialized on first actual use
+Changes in v4:
+- Add SettingsService to retrieve user prompt_customization from database
+- Retrieve user settings in stream_chat() to get stored prompt_customization
+- Combine DB prompt_customization with request prompt_customization
+- Request prompt_customization takes priority if both provided
+- Pass combined prompt to _get_system_prompt()
 
 Chat streaming service
 Handles chat streaming with conversation context and message persistence
@@ -24,6 +30,7 @@ from fastapi import HTTPException, status
 from src.llm.factory import get_llm
 from src.repositories.conversation_repository import ConversationRepository
 from src.repositories.message_repository import MessageRepository
+from src.services.settings_service import SettingsService
 from src.database.interface import IDatabase
 
 logger = logging.getLogger(__name__)
@@ -48,6 +55,7 @@ class ChatService:
         """Initialize service with repositories"""
         self.conversation_repo = ConversationRepository(db=db)
         self.message_repo = MessageRepository(db=db)
+        self.settings_service = SettingsService(db=db)
         self._llm = None  # Lazy-loaded
     
     @property
@@ -150,22 +158,21 @@ class ChatService:
     
     def _get_system_prompt(
         self,
-        user_settings: Optional[Dict[str, Any]] = None
+        prompt_customization: Optional[str] = None
     ) -> Optional[str]:
         """
         Build system prompt with user customization
         
         Args:
-            user_settings: User settings dict with prompt_customization
+            prompt_customization: Combined user prompt customization
             
         Returns:
-            System prompt string or None
+            System prompt string
         """
         base_prompt = "You are a helpful AI assistant."
         
-        if user_settings and user_settings.get("prompt_customization"):
-            customization = user_settings["prompt_customization"]
-            return f"{base_prompt}\n\nUser preferences: {customization}"
+        if prompt_customization:
+            return f"{base_prompt}\n\nUser preferences: {prompt_customization}"
         
         return base_prompt
     
@@ -183,18 +190,20 @@ class ChatService:
         to ensure HTTP exceptions are raised before SSE streaming starts.
         
         Flow:
-        1. Save user message
-        2. Build context with conversation history
-        3. Stream from LLM
-        4. Accumulate response
-        5. Save assistant message
-        6. Update conversation metadata
+        1. Retrieve user settings from database
+        2. Combine DB prompt_customization with request prompt_customization
+        3. Save user message
+        4. Build context with conversation history
+        5. Stream from LLM with combined prompt
+        6. Accumulate response
+        7. Save assistant message
+        8. Update conversation metadata
         
         Args:
             message: User message content
             conversation_id: Conversation ID (already validated)
             current_user: Current user dict
-            prompt_customization: Optional prompt customization from request
+            prompt_customization: Optional prompt customization from request (overrides DB)
             
         Yields:
             Text chunks from LLM
@@ -202,27 +211,38 @@ class ChatService:
         Raises:
             HTTPException 500: Streaming error
         """
-        # 1. Save user message
+        # 1. Retrieve user settings from database
+        user_settings = self.settings_service.get_settings(current_user["id"])
+        db_prompt_customization = user_settings.get("prompt_customization", "")
+        
+        # 2. Combine prompts: request takes priority over DB
+        combined_prompt = prompt_customization if prompt_customization else db_prompt_customization
+        
+        if combined_prompt:
+            logger.info(f"Using prompt customization for user {current_user['id']}: "
+                       f"{'request' if prompt_customization else 'database'}")
+        
+        # 5. Build system prompt with combined customization
+        system_prompt = self._get_system_prompt(combined_prompt)
+        
+        # 3. Save user message with full prompt for traceability
         user_message = {
             "conversation_id": conversation_id,
             "role": "user",
             "content": message,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow(),
+            "llm_full_prompt": system_prompt  # Store full prompt used for this request
         }
         user_msg_doc = self.message_repo.create(user_message)
         logger.info(f"Saved user message: {user_msg_doc['id']}")
         
-        # 2. Build context
+        # 4. Build context
         context = self._build_conversation_context(conversation_id)
         
         # Add current message to context
         context.append({"role": "user", "content": message})
         
-        # 3. Build system prompt
-        user_settings = {"prompt_customization": prompt_customization} if prompt_customization else None
-        system_prompt = self._get_system_prompt(user_settings)
-        
-        # 4. Stream from LLM and accumulate response
+        # 6. Stream from LLM and accumulate response
         full_response = []
         
         try:
@@ -240,18 +260,31 @@ class ChatService:
                 detail=f"Streaming error: {str(e)}"
             )
         
-        # 5. Save assistant message
+        # 7. Save assistant message with raw response and stats
         assistant_content = "".join(full_response)
+        
+        # Get LLM stats if available
+        llm_stats = None
+        if hasattr(self.llm, 'get_stats'):
+            llm_stats = self.llm.get_stats()
+        
         assistant_message = {
             "conversation_id": conversation_id,
             "role": "assistant",
             "content": assistant_content,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow(),
+            "llm_full_prompt": system_prompt,  # Same prompt used for generation
+            "llm_raw_response": assistant_content,  # Store raw response
+            "llm_stats": llm_stats  # Store generation statistics
         }
         assistant_msg_doc = self.message_repo.create(assistant_message)
         logger.info(f"Saved assistant message: {assistant_msg_doc['id']}")
         
-        # 6. Update conversation metadata
+        # Log stats if available
+        if llm_stats:
+            logger.info(f"LLM stats: {llm_stats}")
+        
+        # 8. Update conversation metadata
         # Count messages in conversation
         message_count = self.message_repo.count_by_conversation(conversation_id)
         

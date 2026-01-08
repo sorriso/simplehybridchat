@@ -14,7 +14,6 @@ resources:
   # Persistent Volume Claims
   - arangodb/pvc.yaml
   - minio/pvc.yaml
-  - ollama/pvc.yaml
   - n8n/pvc.yaml
   
   # ConfigMaps
@@ -55,6 +54,7 @@ resources:
   # Jobs
   - n8n/job-init.yaml
   - arangodb/job-init.yaml
+  - ollama/job-init.yaml
 
   # Ingress (last)
   - ingress.yaml
