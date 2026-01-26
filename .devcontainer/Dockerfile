@@ -18,7 +18,7 @@ USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl wget git nano unzip ca-certificates gnupg lsb-release net-tools iputils-ping \
     software-properties-common build-essential \
-    sudo qemu-system-x86 qemu-utils \
+    sudo qemu-system-x86 qemu-utils jq \
     # keep the stock python tools for bootstrapping only
     python3-pip python3-venv \
  && add-apt-repository ppa:deadsnakes/ppa -y \

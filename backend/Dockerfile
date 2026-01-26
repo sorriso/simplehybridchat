@@ -1,24 +1,35 @@
 # path: backend/Dockerfile
-# version: 4.0
+# version: 5.3
 #
 # Development environment with hot reload
-# Based on existing Dockerfile with minimal changes
+# Based on Chainguard Wolfi-based Python image
+FROM cgr.dev/chainguard/python:latest-dev AS builder
 
-FROM python:3.11-slim as builder
+# Switch to root to install system packages
+USER root
 WORKDIR /app
-RUN apt-get update && apt-get install -y gcc g++ && rm -rf /var/lib/apt/lists/*
+
+# Install build dependencies using apk (Wolfi package manager)
+# Note: package names differ from Alpine
+RUN apk add --no-cache build-base
+
+# Switch back to nonroot user for pip install
+USER nonroot
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-FROM python:3.11-slim
+FROM cgr.dev/chainguard/python:latest
 WORKDIR /app
-RUN apt-get update && apt-get upgrade -y
-RUN apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /root/.local /root/.local
+
+# Copy installed packages from nonroot user home
+COPY --from=builder /home/nonroot/.local /home/nonroot/.local
 COPY src/ ./src/
 
-ENV PATH=/root/.local/bin:$PATH
+ENV PATH=/home/nonroot/.local/bin:$PATH
+
 EXPOSE 8000
 
 # Hot reload enabled for development (volume mount overrides src/)
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+# Use full path to uvicorn binary
+CMD ["/home/nonroot/.local/bin/uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]

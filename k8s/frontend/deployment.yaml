@@ -1,11 +1,10 @@
 # path: k8s/frontend/deployment.yaml
-# version: 1.1
+# version: 1.2
 # Frontend deployment
-# Changes in v1.1:
-# - Changed default image to localhost:5000/chatbot-frontend:latest
-# - Image will be updated by Makefile during deployment
-# - FIXED: Changed containerPort from 80 to 3000 (Next.js standalone uses 3000)
-# - FIXED: Updated probes to use port 3000
+# Changes in v1.2:
+# - FIXED: Changed initContainer from nc to wget (busybox compatibility)
+# - FIXED: Added emptyDir volume for .env to avoid permission denied
+# - Backend health check now uses wget instead of nc
 
 apiVersion: apps/v1
 kind: Deployment
@@ -28,10 +27,13 @@ spec:
             - sh
             - -c
             - |
-              until nc -z backend-service 8000; do
-                echo "Waiting for Backend...";
+              echo "Waiting for Backend service..."
+              until wget --spider -q http://backend-service:8000/health 2>/dev/null; do
+                echo "Backend not ready yet, retrying...";
                 sleep 2;
               done
+              echo "Backend is ready!"
+      
       containers:
         - name: frontend
           image: localhost:5000/chatbot-frontend:latest
@@ -51,6 +53,19 @@ spec:
                 secretKeyRef:
                   name: frontend-secret
                   key: NEXT_PUBLIC_MOCK_TOKEN
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+
+          # Mount volume to avoid .env permission error
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nextjs-cache
+              mountPath: /app/.next/cache
 
           resources:
             requests:
@@ -66,6 +81,8 @@ spec:
               port: 3000
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
             
           readinessProbe:
             httpGet:
@@ -73,3 +90,11 @@ spec:
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextjs-cache
+          emptyDir: {}

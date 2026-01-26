@@ -25,6 +25,7 @@ FRONTEND_IMAGE = $(REGISTRY)/chatbot-frontend:$(IMAGE_TAG)
 .DEFAULT_GOAL := help
 
 help: ## Show help
+
 	@echo "Development Commands (Docker Compose):"
 	@echo "  make up                  - Start services"
 	@echo "  make down                - Stop services"
@@ -167,10 +168,10 @@ install-ingress-kube: ## Install NGINX Ingress Controller v1.14.1
 	@echo "🔧 Applying patches to enable snippet annotations..."
 	@echo "   → Patching deployment..."
 	@kubectl patch deployment ingress-nginx-controller -n ingress-nginx \
-		--type='json' --patch-file k8s/nginx-ingress-controller-patch.json
+		--type='json' --patch-file k8s/ingress/nginx-ingress-controller-patch.json
 	@echo "   → Patching configmap..."
 	@kubectl patch configmap ingress-nginx-controller -n ingress-nginx \
-		--type='merge' --patch-file k8s/nginx-ingress-configmap-patch.json
+		--type='merge' --patch-file k8s/ingress/nginx-ingress-configmap-patch.json
 	@echo "✅ Patches applied successfully"
 	@echo ""
 	@echo "♻️  Restarting ingress controller..."

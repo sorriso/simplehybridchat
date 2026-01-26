@@ -1,14 +1,11 @@
 # path: frontend/Dockerfile
-# version: 2
+# version: 3.1
 #
-# Changes in v2:
-# - FIXED: Use Next.js standalone mode instead of static export
-# - FIXED: Serve with Node.js instead of Caddy for better Next.js support
-# - Reason: Static export doesn't support dynamic features, API routes, etc.
-
+# Changes in v3.1:
+# - Added USER root for build stage to allow Next.js to write files
+# - Switched back to nonroot after build completes
 # Stage 1: Install dependencies
-FROM node:25-alpine AS deps
-
+FROM cgr.dev/chainguard/node:latest-dev AS deps
 WORKDIR /app
 
 # Copy package files
@@ -18,8 +15,10 @@ COPY package*.json ./
 RUN npm ci
 
 # Stage 2: Build the Next.js application
-FROM node:25-alpine AS builder
+FROM cgr.dev/chainguard/node:latest-dev AS builder
 
+# Switch to root for build operations (Next.js needs write permissions)
+USER root
 WORKDIR /app
 
 # Copy dependencies from deps stage
@@ -36,27 +35,16 @@ ENV NODE_ENV=production
 RUN npm run build
 
 # Stage 3: Production image
-FROM node:25-alpine AS runner
-
+FROM cgr.dev/chainguard/node:latest AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
-# Copy necessary files from builder
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
-# Set correct ownership
-RUN chown -R nextjs:nodejs /app
-
-# Switch to non-root user
-USER nextjs
+# Copy necessary files from builder (Chainguard uses nonroot user by default)
+COPY --from=builder --chown=nonroot:nonroot /app/public ./public
+COPY --from=builder --chown=nonroot:nonroot /app/.next/standalone ./
+COPY --from=builder --chown=nonroot:nonroot /app/.next/static ./.next/static
 
 # Expose port 3000
 EXPOSE 3000
@@ -64,5 +52,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Start the application
-CMD ["node", "server.js"]
+# Start the application (already running as nonroot user)
+CMD ["server.js"]

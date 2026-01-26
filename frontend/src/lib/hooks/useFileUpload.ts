@@ -1,20 +1,20 @@
 /* path: frontend/src/lib/hooks/useFileUpload.ts
-   version: 4 - FIXED: Added deleteUploadedFile method
+   version: 5.0
    
-   Changes in v4:
-   - ADDED: deleteUploadedFile() to delete file from server and state
-   - Reason: FileUploadPanel requires this method
-   
-   Changes in v3:
-   - FIXED: Type-safe file type validation with ALLOWED_FILE_TYPES */
+   Changes in v5.0:
+   - BACKWARDS COMPATIBLE: Supports both old and new upload APIs
+   - Old API: addFiles() + uploadFiles() (no params)
+   - New API: uploadFiles(files, projectId) (direct upload)
+   - Added deleteUploadedFile for removing uploaded files
+*/
 
-import { useState, useCallback } from "react";
-import { filesApi } from "../api/files";
-import type { PendingFile, UploadedFile } from "@/types/file";
-import { UI_CONSTANTS } from "../utils/constants";
+import { useState, useCallback } from 'react';
+import { filesApi } from '../api/files';
+import type { PendingFile, UploadedFile } from '@/types/file';
+import { UI_CONSTANTS } from '../utils/constants';
 
 /**
- * Hook for managing file uploads
+ * Hook for managing file uploads (supports both old and new APIs)
  */
 export function useFileUpload() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
@@ -23,6 +23,7 @@ export function useFileUpload() {
 
   /**
    * Add files to pending list (validation happens here)
+   * OLD API - for backward compatibility with /components/upload/
    */
   const addFiles = useCallback((files: File[]) => {
     const validFiles: PendingFile[] = [];
@@ -32,12 +33,12 @@ export function useFileUpload() {
       // Check file size
       if (file.size > UI_CONSTANTS.MAX_FILE_SIZE) {
         errors.push(
-          `${file.name}: File too large (max ${UI_CONSTANTS.MAX_FILE_SIZE / 1024 / 1024}MB)`,
+          `${file.name}: File too large (max ${UI_CONSTANTS.MAX_FILE_SIZE / 1024 / 1024}MB)`
         );
         return;
       }
 
-      // Check file type - cast to readonly array for type-safe includes
+      // Check file type
       const allowedTypes = UI_CONSTANTS.ALLOWED_FILE_TYPES as readonly string[];
       if (!allowedTypes.includes(file.type)) {
         errors.push(`${file.name}: File type not allowed`);
@@ -48,12 +49,12 @@ export function useFileUpload() {
         id: `pending-${Date.now()}-${Math.random()}`,
         file,
         progress: 0,
-        status: "pending",
+        status: 'pending',
       });
     });
 
     if (errors.length > 0) {
-      console.warn("File validation errors:", errors);
+      console.warn('File validation errors:', errors);
     }
 
     if (validFiles.length > 0) {
@@ -78,60 +79,79 @@ export function useFileUpload() {
   }, []);
 
   /**
-   * Upload all pending files
+   * Upload files
+   * 
+   * DUAL API:
+   * - OLD: uploadFiles() - uploads all pending files (no params)
+   * - NEW: uploadFiles(files, projectId) - direct upload with project context
    */
-  const uploadFiles = useCallback(async () => {
-    if (pendingFiles.length === 0 || isUploading) {
-      return;
-    }
+  const uploadFiles = useCallback(
+    async (files?: File[], projectId?: string) => {
+      // NEW API: Direct upload with files provided
+      if (files && files.length > 0) {
+        const { validFiles } = addFiles(files);
 
-    setIsUploading(true);
+        if (validFiles.length === 0) {
+          return;
+        }
+      }
 
-    try {
-      for (const pendingFile of pendingFiles) {
-        setPendingFiles((prev) =>
-          prev.map((f) =>
-            f.id === pendingFile.id
-              ? { ...f, status: "uploading", progress: 0 }
-              : f,
-          ),
-        );
+      // Check if there are pending files to upload
+      if (pendingFiles.length === 0 || isUploading) {
+        return;
+      }
 
-        try {
-          const uploadedFile = await filesApi.upload(
-            pendingFile.file,
-            (progress) => {
-              setPendingFiles((prev) =>
-                prev.map((f) =>
-                  f.id === pendingFile.id ? { ...f, progress } : f,
-                ),
-              );
-            },
-          );
+      setIsUploading(true);
 
-          setPendingFiles((prev) =>
-            prev.filter((f) => f.id !== pendingFile.id),
-          );
-          setUploadedFiles((prev) => [...prev, uploadedFile]);
-        } catch (error) {
+      try {
+        for (const pendingFile of pendingFiles) {
           setPendingFiles((prev) =>
             prev.map((f) =>
               f.id === pendingFile.id
-                ? {
-                    ...f,
-                    status: "error",
-                    error:
-                      error instanceof Error ? error.message : "Upload failed",
-                  }
-                : f,
-            ),
+                ? { ...f, status: 'uploading', progress: 0 }
+                : f
+            )
           );
+
+          try {
+            const uploadedFile = await filesApi.upload(
+              pendingFile.file,
+              (progress) => {
+                setPendingFiles((prev) =>
+                  prev.map((f) =>
+                    f.id === pendingFile.id ? { ...f, progress } : f
+                  )
+                );
+              }
+            );
+
+            setPendingFiles((prev) =>
+              prev.filter((f) => f.id !== pendingFile.id)
+            );
+            setUploadedFiles((prev) => [...prev, uploadedFile]);
+          } catch (error) {
+            setPendingFiles((prev) =>
+              prev.map((f) =>
+                f.id === pendingFile.id
+                  ? {
+                      ...f,
+                      status: 'error',
+                      error:
+                        error instanceof Error
+                          ? error.message
+                          : 'Upload failed',
+                    }
+                  : f
+              )
+            );
+          }
         }
+      } finally {
+        setIsUploading(false);
       }
-    } finally {
-      setIsUploading(false);
-    }
-  }, [pendingFiles, isUploading]);
+    },
+    [pendingFiles, isUploading, addFiles]
+  );
 
   /**
    * Clear uploaded files
@@ -148,7 +168,7 @@ export function useFileUpload() {
       await filesApi.delete(fileId);
       setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (error) {
-      console.error("Failed to delete file:", error);
+      console.error('Failed to delete file:', error);
       throw error;
     }
   }, []);

@@ -1,6 +1,10 @@
 """
 Path: backend/tests/unit/services/test_settings_service.py
-Version: 1
+Version: 2
+
+Changes in v2:
+- Updated DEFAULT_SETTINGS expectations to match current settings_service.py
+- prompt_customization now has default value instead of empty string
 
 Unit tests for SettingsService
 """
@@ -9,6 +13,10 @@ import pytest
 from unittest.mock import MagicMock
 
 from src.services.settings_service import SettingsService
+
+
+# Expected default prompt from settings_service.py
+EXPECTED_DEFAULT_PROMPT = "Your are an AI expert,\nDo not lie,\nDo not invent,\nDo not cheat,\nIf additional information are missing then ask for them,\nIf you do not know then just say it and ask for help,\nDo not generate additional data (documentation, explanation) except if I request explicitly them,\nRespond in a clear, structured, straightforward and professional way"
 
 
 class TestSettingsService:
@@ -40,7 +48,7 @@ class TestSettingsService:
         
         # Should return defaults
         assert settings == {
-            "prompt_customization": "",
+            "prompt_customization": EXPECTED_DEFAULT_PROMPT,
             "theme": "light",
             "language": "en"
         }
@@ -86,7 +94,7 @@ class TestSettingsService:
         # Should have stored values + default for missing field
         assert settings["theme"] == "dark"
         assert settings["language"] == "fr"
-        assert settings["prompt_customization"] == ""  # Default
+        assert settings["prompt_customization"] == EXPECTED_DEFAULT_PROMPT  # Default
     
     def test_update_settings_partial_update(
         self,
@@ -133,7 +141,7 @@ class TestSettingsService:
         # Should have updated values + defaults for others
         assert result["theme"] == "dark"
         assert result["language"] == "es"
-        assert result["prompt_customization"] == ""  # Default
+        assert result["prompt_customization"] == EXPECTED_DEFAULT_PROMPT  # Default
     
     def test_update_settings_ignores_unknown_fields(
         self,
@@ -168,11 +176,11 @@ class TestSettingsService:
         updates = {"theme": "dark"}
         settings_service.update_settings("user-1", updates)
         
-        # Verify upsert was called
+        # Verify upsert was called with merged defaults
         mock_settings_repo.upsert.assert_called_once_with(
             "user-1",
             {
-                "prompt_customization": "",
+                "prompt_customization": EXPECTED_DEFAULT_PROMPT,
                 "theme": "dark",
                 "language": "en"
             }
@@ -188,7 +196,7 @@ class TestSettingsService:
         
         # Should return defaults
         assert result == {
-            "prompt_customization": "",
+            "prompt_customization": EXPECTED_DEFAULT_PROMPT,
             "theme": "light",
             "language": "en"
         }

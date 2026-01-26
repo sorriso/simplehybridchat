@@ -1,4 +1,7 @@
-- j ai uploade les toutes dernieres versions de tout les fichiers /src/ et /test/ du frontend ET du backend dans le "projet knowledge" c est a dire le contexte claude, utilises a chaque fois la derniere version / mise a jour disponible
+- ne ments pas
+- ne triche pas
+- n invente pas, utilise des sources de confiance
+- j ai uploade les toutes dernieres versions de tout les fichiers /src/ et /test/ du frontend ET du backend dans le "projet knowledge" c est a dire le contexte claude, utilises a chaque fois la derniere version / mise a jour disponible 
 - je veux que tu ne generes plus AUCUNE documentation *.md ou *.txt (markdown ou texte) tant que je ne te le demande pas explicitement 
 - je veux que tu te concentres UNIQUEMENT sur la generation de code source et que tu le fasse en arriere plan pour etre plus efficace 
 - si il te manque des fichiers ou des informations, demandes les moi avant de commencer a les generer pour rien
