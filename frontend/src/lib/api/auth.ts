@@ -1,13 +1,18 @@
 /* path: frontend/src/lib/api/auth.ts
-   version: 2
+   version: 3.1
    
-   Changes in v2:
-   - FIXED: login() now accepts 'email' parameter instead of 'username'
-   - FIXED: Request body sends { email, password } to match backend v4.0
-   - Reason: Backend expects email (RFC-compliant), not username
+   Changes in v3.1:
+   - ADDED: userManagementApi (was missing in v3.0)
+   - Complete API module with both authApi and userManagementApi
+   
+   Changes in v3:
+   - SECURITY: Passwords hashed with SHA256 before transmission
+   - login() computes password_hash client-side
+   - Backend receives SHA256, stores bcrypt(SHA256)
 */
 
 import { apiClient } from "./client";
+import { hashPasswordForTransmission } from "@/lib/utils/crypto";
 import type {
   User,
   ServerAuthConfig,
@@ -63,13 +68,17 @@ export const authApi = {
 
   /**
    * Login with email/password (for "local" auth mode)
-   * Backend v4.0 expects email (RFC-compliant format)
+   * 
+   * SECURITY: Password is hashed with SHA256 before transmission
    */
   login: async (email: string, password: string): Promise<LoginResponse> => {
+    const passwordHash = await hashPasswordForTransmission(password);
+    
     const response = await apiClient.post<LoginResponse>("/api/auth/login", {
       email,
-      password,
+      password_hash: passwordHash,
     } as LoginRequest);
+    
     return response;
   },
 
@@ -128,6 +137,22 @@ export const userManagementApi = {
   },
 
   /**
+   * Create new user (root only)
+   */
+  createUser: async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    role?: "user" | "manager" | "root";
+  }): Promise<User> => {
+    const response = await apiClient.post<{ user: User }>(
+      "/api/users",
+      userData,
+    );
+    return response.user;
+  },
+
+  /**
    * Activate/deactivate user (manager for their groups, root for all)
    */
   toggleUserStatus: async (
@@ -159,32 +184,32 @@ export const userManagementApi = {
    * Get all user groups
    */
   getAllGroups: async (): Promise<UserGroup[]> => {
-    const response = await apiClient.get<{ groups: UserGroup[] }>(
+    const response = await apiClient.get<{ data: UserGroup[] }>(
       "/api/user-groups",
     );
-    return response.groups;
+    return response.data;
   },
 
   /**
    * Create user group (root only)
    */
   createGroup: async (name: string): Promise<UserGroup> => {
-    const response = await apiClient.post<{ group: UserGroup }>(
+    const response = await apiClient.post<{ data: UserGroup }>(
       "/api/user-groups",
       { name },
     );
-    return response.group;
+    return response.data;
   },
 
   /**
    * Update user group
    */
   updateGroup: async (groupId: string, name: string): Promise<UserGroup> => {
-    const response = await apiClient.put<{ group: UserGroup }>(
+    const response = await apiClient.put<{ data: UserGroup }>(
       `/api/user-groups/${groupId}`,
       { name },
     );
-    return response.group;
+    return response.data;
   },
 
   /**
@@ -194,11 +219,11 @@ export const userManagementApi = {
     groupId: string,
     status: "active" | "disabled",
   ): Promise<UserGroup> => {
-    const response = await apiClient.put<{ group: UserGroup }>(
+    const response = await apiClient.put<{ data: UserGroup }>(
       `/api/user-groups/${groupId}/status`,
       { status },
     );
-    return response.group;
+    return response.data;
   },
 
   /**

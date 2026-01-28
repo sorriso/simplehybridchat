@@ -1,9 +1,13 @@
 /* path: frontend/src/types/auth.ts
-   version: 2
+   version: 3
+   
+   Changes in v3:
+   - SECURITY: LoginRequest now uses password_hash instead of password
+   - Frontend sends SHA256(password) as password_hash
+   - Backend receives hash, not plaintext
    
    Changes in v2:
-   - FIXED: LoginRequest now uses 'email' instead of 'username'
-   - Reason: Backend expects email field, not username (v4.0 backend)
+   - FIXED: LoginRequest uses 'email' instead of 'username'
 */
 
 /**
@@ -29,8 +33,8 @@ export interface UserGroup {
   name: string;
   status: "active" | "disabled";
   createdAt: Date;
-  managerIds: string[]; // Users with manager role for this group
-  memberIds: string[]; // All users in the group
+  managerIds: string[];
+  memberIds: string[];
 }
 
 /**
@@ -42,7 +46,7 @@ export interface User {
   email: string;
   role: UserRole;
   status: UserStatus;
-  groupIds: string[]; // Groups this user belongs to
+  groupIds: string[];
   createdAt: Date;
   lastLogin?: Date;
 }
@@ -52,14 +56,13 @@ export interface User {
  */
 export interface ServerAuthConfig {
   mode: AuthMode;
-  allowMultiLogin: boolean; // Whether multiple simultaneous logins are allowed
-  maintenanceMode: boolean; // Whether app is in maintenance mode
+  allowMultiLogin: boolean;
+  maintenanceMode: boolean;
 
-  // SSO configuration (only present if mode === 'sso')
   ssoConfig?: {
-    tokenHeader: string; // e.g., "X-Auth-Token"
-    nameHeader?: string; // e.g., "X-User-Name"
-    emailHeader?: string; // e.g., "X-User-Email"
+    tokenHeader: string;
+    nameHeader?: string;
+    emailHeader?: string;
     firstNameHeader?: string;
     lastNameHeader?: string;
   };
@@ -79,11 +82,13 @@ export interface UserSession {
 
 /**
  * Login request (for local auth mode)
- * Backend expects email (RFC-compliant format) and password
+ * 
+ * SECURITY: password_hash is SHA256 computed client-side
+ * Backend expects SHA256 hash, not plaintext password
  */
 export interface LoginRequest {
   email: string;
-  password: string;
+  password_hash: string;
 }
 
 /**
@@ -109,18 +114,15 @@ export interface AuthContextState {
  * Permissions helper type
  */
 export interface UserPermissions {
-  // User permissions
   canUseApp: boolean;
   canManageOwnPreferences: boolean;
   canShareOwnConversations: boolean;
   canForceLogout: boolean;
 
-  // Manager permissions
   canManageGroupMembers: boolean;
   canActivateDeactivateGroupMembers: boolean;
   canManageGroups: boolean;
 
-  // Root permissions
   canManageAllUsers: boolean;
   canCreateGroups: boolean;
   canAssignManagers: boolean;
@@ -134,6 +136,6 @@ export interface UserPermissions {
 export interface ConversationShare {
   conversationId: string;
   sharedWithGroupIds: string[];
-  sharedBy: string; // userId
+  sharedBy: string;
   sharedAt: Date;
 }

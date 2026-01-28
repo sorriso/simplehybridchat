@@ -1,5 +1,11 @@
 /* path: frontend/src/lib/hooks/useFileUpload.ts
-   version: 5.0
+   version: 5.1
+   
+   Changes in v5.1:
+   - CRITICAL FIX: Added useEffect to load existing files from API on mount
+   - Files uploaded in previous sessions now appear in the panel
+   - Added loadUploadedFiles() method for manual refresh
+   - Added isLoading state
    
    Changes in v5.0:
    - BACKWARDS COMPATIBLE: Supports both old and new upload APIs
@@ -8,7 +14,7 @@
    - Added deleteUploadedFile for removing uploaded files
 */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { filesApi } from '../api/files';
 import type { PendingFile, UploadedFile } from '@/types/file';
 import { UI_CONSTANTS } from '../utils/constants';
@@ -20,6 +26,31 @@ export function useFileUpload() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // NEW in v5.1
+
+  /**
+   * Load uploaded files from API
+   * NEW in v5.1: Called on mount and after uploads
+   */
+  const loadUploadedFiles = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const files = await filesApi.getAll();
+      setUploadedFiles(files);
+    } catch (error) {
+      console.error('Failed to load files:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /**
+   * Load files on mount
+   * NEW in v5.1: Ensures existing files are displayed
+   */
+  useEffect(() => {
+    loadUploadedFiles();
+  }, [loadUploadedFiles]);
 
   /**
    * Add files to pending list (validation happens here)
@@ -84,6 +115,8 @@ export function useFileUpload() {
    * DUAL API:
    * - OLD: uploadFiles() - uploads all pending files (no params)
    * - NEW: uploadFiles(files, projectId) - direct upload with project context
+   * 
+   * UPDATED in v5.1: Reloads files from API after successful upload
    */
   const uploadFiles = useCallback(
     async (files?: File[], projectId?: string) => {
@@ -128,6 +161,8 @@ export function useFileUpload() {
             setPendingFiles((prev) =>
               prev.filter((f) => f.id !== pendingFile.id)
             );
+            
+            // Optimistic update
             setUploadedFiles((prev) => [...prev, uploadedFile]);
           } catch (error) {
             setPendingFiles((prev) =>
@@ -146,15 +181,18 @@ export function useFileUpload() {
             );
           }
         }
+        
+        // NEW in v5.1: Reload all files from API after upload to sync state
+        await loadUploadedFiles();
       } finally {
         setIsUploading(false);
       }
     },
-    [pendingFiles, isUploading, addFiles]
+    [pendingFiles, isUploading, addFiles, loadUploadedFiles]
   );
 
   /**
-   * Clear uploaded files
+   * Clear uploaded files (local state only, doesn't delete from server)
    */
   const clearUploadedFiles = useCallback(() => {
     setUploadedFiles([]);
@@ -162,26 +200,34 @@ export function useFileUpload() {
 
   /**
    * Delete an uploaded file from server
+   * UPDATED in v5.1: Reloads files from API after delete
    */
   const deleteUploadedFile = useCallback(async (fileId: string) => {
     try {
       await filesApi.delete(fileId);
+      
+      // Optimistic update
       setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
+      
+      // NEW in v5.1: Reload to ensure sync with server
+      await loadUploadedFiles();
     } catch (error) {
       console.error('Failed to delete file:', error);
       throw error;
     }
-  }, []);
+  }, [loadUploadedFiles]);
 
   return {
     pendingFiles,
     uploadedFiles,
     isUploading,
+    isLoading, // NEW in v5.1
     addFiles,
     removePendingFile,
     clearPendingFiles,
     uploadFiles,
     clearUploadedFiles,
     deleteUploadedFile,
+    loadUploadedFiles, // NEW in v5.1: Exposed for manual refresh
   };
 }

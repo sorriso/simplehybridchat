@@ -1,27 +1,21 @@
 """
 Path: backend/src/services/auth_service.py
-Version: 3.3
+Version: 4.0
+
+Changes in v4.0:
+- SECURITY: Adapted to receive password_hash instead of password
+- login() receives SHA256 hash, compares with bcrypt(SHA256)
+- register() receives SHA256 hash, stores bcrypt(SHA256)
+- Never handles plaintext passwords
 
 Changes in v3.3:
-- FIX: SSO response Dict now uses camelCase keys (accessToken, tokenType, expiresIn)
-- Matches API convention for consistent frontend integration
+- FIX: SSO response Dict uses camelCase keys (accessToken, tokenType, expiresIn)
 
 Changes in v3.2:
-- FIX: verify_sso_session now returns Dict[str, Any] instead of TokenResponse
-- Dict includes: access_token, token_type, expires_in, user (UserResponse)
-- TokenResponse in project doesn't support 'user' field
-- This allows SSO to return both token info and user data
+- FIX: verify_sso_session returns Dict instead of TokenResponse
 
 Changes in v3.1:
 - FIX: Added expires_in=0 to TokenResponse in verify_sso_session()
-- SSO tokens don't expire (handled by SSO provider)
-
-Changes in v3:
-- Added verify_sso_session() method for SSO authentication
-- Auto-creates user if doesn't exist in SSO mode
-- Returns TokenResponse with user info and dummy token
-
-Authentication service for login, register, token management
 """
 
 from typing import Dict, Any, Optional
@@ -44,10 +38,15 @@ class AuthService:
     """
     Authentication service
     
-    Handles user authentication operations:
+    SECURITY MODEL:
+    - Receives SHA256(password) from frontend as password_hash
+    - Stores bcrypt(SHA256) in database
+    - Never handles plaintext passwords
+    
+    Handles:
     - User registration
     - Login with JWT tokens
-    - SSO session verification (mode "sso")
+    - SSO session verification
     - Token validation
     """
     
@@ -65,8 +64,11 @@ class AuthService:
         """
         Register new user
         
+        SECURITY: request.password_hash is SHA256 computed by frontend
+        This method applies bcrypt on top of SHA256 before storing
+        
         Args:
-            request: Registration request with name, email, password
+            request: Registration request with name, email, password_hash (SHA256)
             
         Returns:
             UserResponse with created user info
@@ -75,7 +77,6 @@ class AuthService:
             HTTPException: If email already exists or validation fails
         """
         try:
-            # Check if email exists
             existing_user = self.user_repo.get_by_email(request.email)
             if existing_user:
                 raise HTTPException(
@@ -83,16 +84,15 @@ class AuthService:
                     detail="Email already registered"
                 )
             
-            # Hash password
-            password_hash = hash_password(request.password)
+            # Apply bcrypt to the SHA256 hash received from frontend
+            password_hash_bcrypt = hash_password(request.password_hash)
             
-            # Create user
             user_data = {
                 "name": request.name,
                 "email": request.email,
-                "password_hash": password_hash,
-                "role": "user",  # Default role
-                "status": "active",  # Default status
+                "password_hash": password_hash_bcrypt,
+                "role": "user",
+                "status": "active",
                 "group_ids": [],
                 "created_at": datetime.utcnow(),
                 "updated_at": None
@@ -124,8 +124,11 @@ class AuthService:
         """
         Authenticate user and generate JWT token
         
+        SECURITY: request.password_hash is SHA256 computed by frontend
+        This method verifies bcrypt(SHA256_received) against stored bcrypt(SHA256)
+        
         Args:
-            request: Login request with email and password
+            request: Login request with email and password_hash (SHA256)
             
         Returns:
             TokenResponse with JWT token
@@ -134,7 +137,6 @@ class AuthService:
             HTTPException: If credentials invalid or user disabled
         """
         try:
-            # Find user by email
             user = self.user_repo.get_by_email(request.email)
             
             if not user:
@@ -143,21 +145,19 @@ class AuthService:
                     detail="Invalid credentials"
                 )
             
-            # Verify password
-            if not verify_password(request.password, user["password_hash"]):
+            # Verify SHA256 hash against stored bcrypt(SHA256)
+            if not verify_password(request.password_hash, user["password_hash"]):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid credentials"
                 )
             
-            # Check user status
             if user.get("status") != "active":
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Account is disabled"
                 )
             
-            # Generate JWT token
             token_data = {
                 "sub": user["id"],
                 "email": user["email"],
@@ -197,7 +197,6 @@ class AuthService:
         try:
             payload = decode_access_token(token)
             
-            # Get user to verify still exists and is active
             user = self.user_repo.get_by_id(payload["sub"])
             
             if not user:
@@ -245,30 +244,21 @@ class AuthService:
             name: User name from SSO header (optional)
             
         Returns:
-            Dict with token info and user data (camelCase keys):
-            {
-                "accessToken": "sso-authenticated",
-                "tokenType": "sso",
-                "expiresIn": 0,
-                "user": UserResponse model (as dict via .model_dump())
-            }
+            Dict with token info and user data (camelCase keys)
             
         Raises:
             HTTPException: If verification fails or user is disabled
         """
         try:
-            # Check if user exists
             user = self.user_repo.get_by_email(email)
             
             if user:
-                # User exists - return it
                 logger.info(f"SSO: Found existing user {user['id']} ({email})")
             else:
-                # User doesn't exist - create it
                 user_data = {
                     "name": name or email.split("@")[0],
                     "email": email,
-                    "password_hash": hash_password("sso-no-password"),  # Dummy password
+                    "password_hash": hash_password("sso-no-password"),
                     "role": "user",
                     "status": "active",
                     "group_ids": [],
@@ -279,14 +269,12 @@ class AuthService:
                 user = self.user_repo.create(user_data)
                 logger.info(f"SSO: Auto-created user {user['id']} ({email})")
             
-            # Check user status
             if user.get("status") == "disabled":
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Account is disabled"
                 )
             
-            # Prepare user response
             user_response = UserResponse(
                 id=user["id"],
                 name=user["name"],
@@ -298,21 +286,16 @@ class AuthService:
                 updated_at=user.get("updated_at")
             )
             
-            # In SSO mode, return token info + user data as dict
-            # (TokenResponse doesn't support 'user' field in the project)
-            # Use camelCase keys for API consistency
             return {
-                "accessToken": "sso-authenticated",  # Dummy token
+                "accessToken": "sso-authenticated",
                 "tokenType": "sso",
-                "expiresIn": 0,  # No expiration for SSO
+                "expiresIn": 0,
                 "user": user_response.model_dump(by_alias=True)
             }
             
         except HTTPException:
             raise
         except DuplicateKeyError:
-            # Race condition: user was created between check and create
-            # Retry once
             user = self.user_repo.get_by_email(email)
             if user:
                 user_response = UserResponse(
@@ -364,7 +347,6 @@ class AuthService:
             HTTPException: If current password wrong or user not found
         """
         try:
-            # Get user
             user = self.user_repo.get_by_id(user_id)
             
             if not user:
@@ -373,17 +355,14 @@ class AuthService:
                     detail="User not found"
                 )
             
-            # Verify current password
             if not verify_password(current_password, user["password_hash"]):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Current password is incorrect"
                 )
             
-            # Hash new password
             new_password_hash = hash_password(new_password)
             
-            # Update password
             update_data = {
                 "password_hash": new_password_hash,
                 "updated_at": datetime.utcnow()

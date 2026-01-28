@@ -1,5 +1,12 @@
 /* path: frontend/src/components/sidebar/ConversationGroup.tsx
-   version: 3 - FIXED: Added onConversationShare prop to pass to ConversationItem components */
+   version: 4.0
+   
+   Changes in v4.0:
+   - ADDED: onConversationUngroup prop to remove conversations from group
+   - ADDED: Pass onUngroup to ConversationItem components
+   - COMPACT: Reduced padding on group header (py-2 → py-1.5)
+   - SMALLER: Group font (text-sm → text-xs)
+*/
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Folder, Trash2, Edit2 } from "lucide-react";
@@ -19,6 +26,7 @@ interface ConversationGroupProps {
   onConversationDelete: (id: string) => void;
   onConversationRename: (id: string) => void;
   onConversationShare: (id: string) => void;
+  onConversationUngroup: (id: string) => void; // NEW
   onGroupDelete: () => void;
   onGroupRename: () => void;
   onConversationDrop?: (conversationId: string, groupId: string) => void;
@@ -27,9 +35,6 @@ interface ConversationGroupProps {
   onDragEnd?: () => void;
 }
 
-/**
- * Collapsible group of conversations with drop zone functionality
- */
 export function ConversationGroup({
   group,
   conversations,
@@ -38,6 +43,7 @@ export function ConversationGroup({
   onConversationDelete,
   onConversationRename,
   onConversationShare,
+  onConversationUngroup,
   onGroupDelete,
   onGroupRename,
   onConversationDrop,
@@ -48,21 +54,18 @@ export function ConversationGroup({
   const [isExpanded, setIsExpanded] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Filter conversations that belong to this group
-  const groupConversations = conversations.filter(
-    (c) => c.groupId === group.id,
-  );
+  const groupConversations = conversations.filter((c) => c.groupId === group.id);
 
   const contextMenuItems = [
     {
       label: "Rename",
       onClick: onGroupRename,
-      icon: <Edit2 size={16} />,
+      icon: <Edit2 size={14} />,
     },
     {
       label: "Delete",
       onClick: onGroupDelete,
-      icon: <Trash2 size={16} />,
+      icon: <Trash2 size={14} />,
       variant: "danger" as const,
     },
   ];
@@ -90,7 +93,6 @@ export function ConversationGroup({
 
   return (
     <div className="mb-1">
-      {/* Group header */}
       <ContextMenu items={contextMenuItems}>
         <div
           onDragOver={handleDragOver}
@@ -104,27 +106,22 @@ export function ConversationGroup({
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className={clsx(
-              "w-full px-3 py-2 rounded-lg text-left",
+              "w-full px-2.5 py-1.5 rounded-lg text-left",
               "flex items-center gap-2 transition-colors",
               "hover:bg-gray-100 text-gray-700",
             )}
           >
-            {isExpanded ? (
-              <ChevronDown size={16} />
-            ) : (
-              <ChevronRight size={16} />
-            )}
-            <Folder size={16} />
-            <span className="text-sm font-medium flex-1">{group.name}</span>
-            <span className="text-xs text-gray-500">
+            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <Folder size={14} />
+            <span className="text-xs font-medium flex-1">{group.name}</span>
+            <span className="text-[11px] text-gray-500">
               {groupConversations.length}
             </span>
           </button>
 
-          {/* Drop indicator */}
           {isDragOver && draggingConversationId && (
-            <div className="px-3 py-1">
-              <p className="text-xs text-primary-600">
+            <div className="px-2.5 py-1">
+              <p className="text-[11px] text-primary-600">
                 Drop here to move to {group.name}
               </p>
             </div>
@@ -132,11 +129,10 @@ export function ConversationGroup({
         </div>
       </ContextMenu>
 
-      {/* Conversations list */}
       {isExpanded && (
-        <div className="ml-4 mt-1 space-y-1">
+        <div className="ml-3 mt-1 space-y-1">
           {groupConversations.length === 0 ? (
-            <p className="text-xs text-gray-400 italic px-3 py-2">
+            <p className="text-[11px] text-gray-400 italic px-2.5 py-1.5">
               No conversations in this group
             </p>
           ) : (
@@ -149,6 +145,7 @@ export function ConversationGroup({
                 onDelete={() => onConversationDelete(conversation.id)}
                 onRename={() => onConversationRename(conversation.id)}
                 onShare={() => onConversationShare(conversation.id)}
+                onUngroup={() => onConversationUngroup(conversation.id)}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
                 isDragging={conversation.id === draggingConversationId}

@@ -12,4 +12,5 @@
 - l objectif est de generer et tester le code source avec un vrai valeur ajoutée et non pas de faire en sorte que le code et les tests passent sans erreur et sans valeur ajoutées 
 -> aide moi a debuguer
 
-user@localhost.com MyStrongPwd1
+ROOT_USER_EMAIL=root@example.com
+ROOT_USER_PASSWORD=RootPass123

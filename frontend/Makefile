@@ -1,307 +1,266 @@
-# =============================================================================
-# Makefile - Frontend Application
-# =============================================================================
-# path: frontend/./Makefile
-# version: 18
+# path: Makefile
+# version: 7.0
+# Changes in v7.0:
+# - Added dev-up, dev-down, dev-logs, dev-restart for development workflow
+# - Simplified commands: just "make dev-up" to start development environment
+# - Uses docker-compose.yaml (single file for dev)
+# Changes in v6.3:
+# - Added automatic patch for nginx ingress controller after installation
+# - Enables snippet annotations for custom nginx configuration
+# Changes in v6.2:
+# - Added install-ingress-kube command to install NGINX Ingress Controller v1.14.1
+# Changes in v6.1:
+# - Added build-images-kube command to build Docker images for k8s
+# - up-kube now builds images before deploying
+# - Added REGISTRY and IMAGE_TAG variables for image configuration
 #
-# Description:
-#   Simple and complete Makefile for Next.js chatbot frontend application.
-#
-# Changes in v18:
-#   - Added automatic Jest cache cleanup before running tests
-#   - Added clean-test-cache target to clear Jest cache
-#   - test-unit and test-int now auto-clean cache before running
-#
-# Usage:
-#   make help              - Show all available commands
-#   make install-app       - Install application (npm dependencies)
-#   make dev               - Start development server (with cache cleanup)
-#   make build             - Build for production (with lint + format check)
-#   make test              - Run all tests (with cache cleanup)
-#   make lint              - Run linter
-#   make format            - Auto-format code
-#   make list-files        - List all project files
-# =============================================================================
+# Development environment: Docker Compose (docker-compose.yaml)
+# Production: Kubernetes (k8s/)
+
+# Kubernetes image configuration
+REGISTRY ?= localhost:5000
+IMAGE_TAG ?= latest
+BACKEND_IMAGE = $(REGISTRY)/chatbot-backend:$(IMAGE_TAG)
+FRONTEND_IMAGE = $(REGISTRY)/chatbot-frontend:$(IMAGE_TAG)
+
+.PHONY: help dev-up dev-down dev-logs dev-restart dev-build dev-clean dev-shell-backend dev-shell-frontend
+.PHONY: up-kube down-kube logs-kube status-kube build-images-kube install-ingress-kube
 
 .DEFAULT_GOAL := help
 
-# =============================================================================
-# HELP
-# =============================================================================
-
-.PHONY: help
-help:
+help: ## Show help
 	@echo ""
-	@echo "==================================================="
-	@echo "  Frontend Application - Commands"
-	@echo "==================================================="
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  🚀 Development Commands (Docker Compose)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  make dev-up              - Start all services (hot-reload enabled)"
+	@echo "  make dev-down            - Stop all services"
+	@echo "  make dev-logs            - Show logs (all services)"
+	@echo "  make dev-restart         - Restart all services"
+	@echo "  make dev-build           - Rebuild images"
+	@echo "  make dev-clean           - Stop services and remove volumes"
+	@echo "  make dev-shell-backend   - Open shell in backend container"
+	@echo "  make dev-shell-frontend  - Open shell in frontend container"
 	@echo ""
-	@echo "INSTALLATION:"
-	@echo "  make install-app     Install application only (npm deps)"
-	@echo "  make install-tests   Install EVERYTHING (app + ALL browsers)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  ☸️  Kubernetes Commands (Production)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  make install-ingress-kube - Install NGINX Ingress Controller"
+	@echo "  make build-images-kube   - Build Docker images for k8s"
+	@echo "  make up-kube             - Build images + Deploy to k8s"
+	@echo "  make down-kube           - Remove from k8s"
+	@echo "  make status-kube         - Show k8s deployment status"
+	@echo "  make logs-kube           - Show k8s pod logs"
 	@echo ""
-	@echo "DEVELOPMENT:"
-	@echo "  make dev             Start dev server (hot reload + cache cleanup)"
-	@echo "  make build           Build for production (with lint + format check)"
-	@echo "  make start           Start production server"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  🌐 URLs (Development)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Frontend:  http://localhost:3000"
+	@echo "  Backend:   http://localhost:8000"
+	@echo "  API Docs:  http://localhost:8000/docs"
+	@echo "  ArangoDB:  http://localhost:8529 (root/changeme)"
+	@echo "  MinIO:     http://localhost:9001 (minioadmin/minioadmin)"
 	@echo ""
-	@echo "TESTS:"
-	@echo "  make test            Run ALL tests (all browsers, with cache cleanup)"
-	@echo "  make test-unit       Unit tests only (with cache cleanup)"
-	@echo "  make test-int        Integration tests only (with cache cleanup)"
-	@echo "  make test-e2e        E2E tests (Chromium + Firefox + Webkit)"
-	@echo "  make test-coverage   Run tests with coverage report"
-	@echo ""
-	@echo "CODE QUALITY:"
-	@echo "  make lint            Run linter"
-	@echo "  make lint-fix        Fix lint issues automatically"
-	@echo "  make format          Auto-format code with prettier"
-	@echo "  make format-check    Check code formatting"
-	@echo "  make check           Run lint + format check"
-	@echo ""
-	@echo "OPTIONAL - Test single browser:"
-	@echo "  make test-e2e-chromium    E2E Chromium only (fastest)"
-	@echo "  make test-e2e-firefox     E2E Firefox only"
-	@echo "  make test-e2e-webkit      E2E Webkit only"
-	@echo ""
-	@echo "MAINTENANCE:"
-	@echo "  make clean           Clean build artifacts"
-	@echo "  make clean-cache     Clean Next.js cache only"
-	@echo "  make clean-test-cache Clean Jest test cache only"
-	@echo "  make reset           HARD RESET everything"
-	@echo "  make list-files      List all project files (exclude build dirs)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  📝 Quick Start"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  1. Copy backend/.env.example to backend/.env"
+	@echo "  2. Run: make dev-up"
+	@echo "  3. Edit code in backend/src/ or frontend/src/"
+	@echo "  4. See changes automatically!"
 	@echo ""
 
 # =============================================================================
-# INSTALLATION
+# Development Commands (Docker Compose)
 # =============================================================================
 
-.PHONY: install-app
-install-app:
-	@echo "==================================================="
-	@echo "  Installing Application"
-	@echo "==================================================="
-	npm install
+dev-up: ## Start development environment
+	@echo "🚀 Starting development environment..."
+	@if [ ! -f backend/.env ]; then \
+		echo "⚠️  backend/.env not found"; \
+		if [ -f backend/env.example ]; then \
+			echo "📝 Creating backend/.env from env.example..."; \
+			cp backend/env.example backend/.env; \
+			echo "✅ Created backend/.env"; \
+		else \
+			echo "❌ backend/env.example not found"; \
+			echo "Please create backend/.env manually"; \
+			exit 1; \
+		fi \
+	fi
+	@docker-compose up -d
+	@echo "✅ Services started"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 Access your application:"
+	@echo "   Frontend:  http://localhost:3000"
+	@echo "   Backend:   http://localhost:8000"
+	@echo "   API Docs:  http://localhost:8000/docs"
+	@echo "   ArangoDB:  http://localhost:8529"
+	@echo "   MinIO:     http://localhost:9001"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "💡 Hot-reload is enabled:"
+	@echo "   • Edit backend/src/ → Backend restarts automatically"
+	@echo "   • Edit frontend/src/ → Browser reloads automatically"
+	@echo ""
+	@echo "📋 View logs: make dev-logs"
+	@echo ""
 
-.PHONY: install-tests
-install-tests:
-	@echo "==================================================="
-	@echo "  Installing Application + Test Browsers"
-	@echo "==================================================="
-	@echo ""
-	@echo "[1/2] Installing npm dependencies..."
-	npm install
-	@echo ""
-	@echo "[2/2] Installing Playwright browsers (Chromium + Firefox + Webkit)..."
-	npx playwright install
-	@echo ""
-	@echo "Done! All dependencies and browsers installed."
+dev-down: ## Stop development environment
+	@echo "🛑 Stopping development environment..."
+	@docker-compose down
+	@echo "✅ Services stopped"
+
+dev-logs: ## Show logs from all services
+	@docker-compose logs -f
+
+dev-restart: ## Restart all services
+	@echo "🔄 Restarting services..."
+	@docker-compose restart
+	@echo "✅ Services restarted"
+
+dev-build: ## Rebuild development images
+	@echo "🔨 Rebuilding development images..."
+	@docker-compose build --no-cache
+	@echo "✅ Images rebuilt"
+
+dev-clean: ## Stop services and remove volumes
+	@echo "🧹 Cleaning development environment..."
+	@docker-compose down -v
+	@echo "✅ Cleaned (containers and volumes removed)"
+
+dev-shell-backend: ## Open shell in backend container
+	@docker-compose exec backend /bin/bash
+
+dev-shell-frontend: ## Open shell in frontend container
+	@docker-compose exec frontend /bin/sh
 
 # =============================================================================
-# DEVELOPMENT
+# Kubernetes Commands (Production)
 # =============================================================================
 
-.PHONY: dev
-dev:
-	@echo "==================================================="
-	@echo "  Starting Development Server"
-	@echo "==================================================="
+install-ingress-kube: ## Install NGINX Ingress Controller v1.14.1
+	@echo "🔄 Installing NGINX Ingress Controller v1.14.1..."
+	@kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.14.1/deploy/static/provider/cloud/deploy.yaml
+	@echo "✅ NGINX Ingress Controller manifest applied"
 	@echo ""
-	@echo "[1/2] Cleaning Next.js cache..."
-	@rm -rf .next 2>/dev/null || true
-	@rm -rf node_modules/.cache 2>/dev/null || true
-	@rm -rf .turbo 2>/dev/null || true
-	@echo "✓ Cache cleaned (.next, node_modules/.cache, .turbo)"
+	@echo "⏳ Waiting for ingress controller to be ready (this may take a few minutes)..."
+	@kubectl wait --namespace ingress-nginx \
+		--for=condition=ready pod \
+		--selector=app.kubernetes.io/component=controller \
+		--timeout=300s
 	@echo ""
-	@echo "[2/2] Starting dev server -> http://localhost:3000"
-	@npm run dev
-
-.PHONY: build
-build:
-	@echo "==================================================="
-	@echo "  Building for Production"
-	@echo "==================================================="
+	@echo "✅ NGINX Ingress Controller is ready!"
 	@echo ""
-	@echo "[1/4] Linting code..."
-	@npm run lint
+	@echo "🔧 Applying patches to enable snippet annotations..."
+	@echo "   → Patching deployment..."
+	@kubectl patch deployment ingress-nginx-controller -n ingress-nginx \
+		--type='json' --patch-file k8s/ingress/nginx-ingress-controller-patch.json
+	@echo "   → Patching configmap..."
+	@kubectl patch configmap ingress-nginx-controller -n ingress-nginx \
+		--type='merge' --patch-file k8s/ingress/nginx-ingress-configmap-patch.json
+	@echo "✅ Patches applied successfully"
 	@echo ""
-	@echo "[2/4] Formatting code..."
-	@npx prettier --write "src/**/*.{ts,tsx,js,jsx,json,css,md}"
-	@echo "Code formatted!"
+	@echo "♻️  Restarting ingress controller..."
+	@kubectl delete pods -n ingress-nginx -l app.kubernetes.io/component=controller
+	@echo "✅ Pod deleted, waiting for new pod to be ready..."
 	@echo ""
-	@echo "[3/4] Cleaning previous builds..."
-	@rm -rf .next out 2>/dev/null || true
+	@echo "⏳ Waiting for controller to restart with new configuration..."
+	@kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=120s
 	@echo ""
-	@echo "[4/4] Building..."
-	@npm run build
+	@echo "✅ NGINX Ingress Controller patched and ready!"
 	@echo ""
-	@echo "Build complete!"
-
-.PHONY: start
-start:
-	@echo "Starting production -> http://localhost:3000"
-	npx serve@latest out -l 3000
-
-# =============================================================================
-# TESTS
-# =============================================================================
-
-.PHONY: test
-test: clean-test-cache test-unit test-int
-
-.PHONY: test-unit
-test-unit: clean-test-cache
-	@echo "==================================================="
-	@echo "  Running Unit Tests"
-	@echo "==================================================="
+	@echo "📊 Ingress controller status:"
+	@kubectl get pods -n ingress-nginx
 	@echo ""
-	npx jest tests/unit
-
-.PHONY: test-int
-test-int: clean-test-cache
-	@echo "==================================================="
-	@echo "  Running Integration Tests"
-	@echo "==================================================="
+	@kubectl get svc -n ingress-nginx
 	@echo ""
-	npx jest tests/integration
+	@echo "⚠️  Note: This project will be retired in March 2026"
+	@echo "    Consider migrating to Gateway API or F5 NGINX Ingress Controller"
 
-.PHONY: test-e2e
-test-e2e:
-	@echo "E2E tests (all browsers)..."
-	npx playwright test
-
-.PHONY: test-e2e-chromium
-test-e2e-chromium:
-	@echo "E2E tests (Chromium only)..."
-	npx playwright test --project=chromium
-
-.PHONY: test-e2e-firefox
-test-e2e-firefox:
-	@echo "E2E tests (Firefox only)..."
-	npx playwright test --project=firefox
-
-.PHONY: test-e2e-webkit
-test-e2e-webkit:
-	@echo "E2E tests (Webkit only)..."
-	npx playwright test --project=webkit
-
-.PHONY: test-coverage
-test-coverage: clean-test-cache
-	@echo "==================================================="
-	@echo "  Running tests with coverage"
-	@echo "==================================================="
+build-images-kube: ## Build Docker images for Kubernetes
+	@echo "🔨 Building backend image: $(BACKEND_IMAGE)"
+	docker build -t $(BACKEND_IMAGE) ./backend
+	@echo "✅ Backend image built"
 	@echo ""
-	npx jest --coverage
+	@echo "🔨 Building frontend image: $(FRONTEND_IMAGE)"
+	docker build -t $(FRONTEND_IMAGE) ./frontend
+	@echo "✅ Frontend image built"
 	@echo ""
-	@echo "Coverage report generated in coverage/"
-	@echo "   Open coverage/lcov-report/index.html in browser to see details"
-
-# =============================================================================
-# CODE QUALITY
-# =============================================================================
-
-.PHONY: lint
-lint:
-	@echo "Linting code..."
-	@npm run lint
-
-.PHONY: lint-fix
-lint-fix:
-	@echo "Fixing lint issues..."
-	@npm run lint:fix
-	@echo "Lint issues fixed!"
-
-.PHONY: format
-format:
-	@echo "Formatting code..."
-	npx prettier --write "src/**/*.{ts,tsx,js,jsx,json,css,md}"
-	@echo "Code formatted!"
-
-.PHONY: format-check
-format-check:
-	@echo "Checking code format..."
-	npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,md}"
-
-.PHONY: check
-check:
-	@echo "==================================================="
-	@echo "  Running code quality checks"
-	@echo "==================================================="
+	@echo "📦 Images created:"
+	@echo "  Backend:  $(BACKEND_IMAGE)"
+	@echo "  Frontend: $(FRONTEND_IMAGE)"
 	@echo ""
-	@echo "[1/2] Linting..."
-	@npm run lint
+	@if [ "$(REGISTRY)" != "localhost:5000" ] && [ "$(REGISTRY)" != "minikube" ] && [ "$(REGISTRY)" != "kind" ]; then \
+		echo "💡 To push images to registry, run:"; \
+		echo "  docker push $(BACKEND_IMAGE)"; \
+		echo "  docker push $(FRONTEND_IMAGE)"; \
+	fi
+
+up-kube: build-images-kube ## Build images + Deploy to Kubernetes
 	@echo ""
-	@echo "[2/2] Checking format..."
-	@npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,md}"
+	@echo "🔄 Updating deployment images..."
+	@sed -i.bak "s|image:.*chatbot-backend:.*|image: $(BACKEND_IMAGE)|g" k8s/backend/deployment.yaml
+	@sed -i.bak "s|image:.*chatbot-frontend:.*|image: $(FRONTEND_IMAGE)|g" k8s/frontend/deployment.yaml
+	@rm -f k8s/backend/deployment.yaml.bak k8s/frontend/deployment.yaml.bak
+	@echo "✅ Deployment images updated"
 	@echo ""
-	@echo "All checks passed!"
-
-# =============================================================================
-# MAINTENANCE
-# =============================================================================
-
-.PHONY: clean
-clean:
-	@echo "Cleaning build artifacts..."
-	rm -rf .next out coverage playwright-report test-results
-	@echo "Clean complete!"
-
-.PHONY: clean-cache
-clean-cache:
-	@echo "Cleaning Next.js cache..."
-	@rm -rf .next 2>/dev/null || true
-	@rm -rf node_modules/.cache 2>/dev/null || true
-	@rm -rf .turbo 2>/dev/null || true
-	@echo "✓ Cache cleaned (.next, node_modules/.cache, .turbo)"
-
-.PHONY: clean-test-cache
-clean-test-cache:
-	@echo "Cleaning Jest test cache..."
-	@rm -rf node_modules/.cache/jest 2>/dev/null || true
-	@rm -rf .jest-cache 2>/dev/null || true
-	@npx jest --clearCache 2>/dev/null || true
-	@echo "✓ Jest cache cleared"
-
-.PHONY: reset
-reset:
-	@echo "==================================================="
-	@echo "  HARD RESET - Deleting everything"
-	@echo "==================================================="
+	@echo "🚀 Deploying to Kubernetes..."
+	kubectl apply -k k8s/
+	@echo "✅ Deployment completed"
 	@echo ""
-	@echo "This will delete:"
-	@echo "  - node_modules/"
-	@echo "  - package-lock.json"
-	@echo "  - All build artifacts"
+	@echo "⏳ Waiting for pods to be ready (this may take a few minutes)..."
 	@echo ""
-	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	@kubectl wait --for=condition=ready pod -l app=arangodb -n chatbot --timeout=300s 2>/dev/null || true
+	@kubectl wait --for=condition=ready pod -l app=minio -n chatbot --timeout=300s 2>/dev/null || true
+	@kubectl wait --for=condition=ready pod -l app=ollama -n chatbot --timeout=300s 2>/dev/null || true
+	@kubectl wait --for=condition=ready pod -l app=backend -n chatbot --timeout=300s 2>/dev/null || true
+	@kubectl wait --for=condition=ready pod -l app=frontend -n chatbot --timeout=300s 2>/dev/null || true
+	@kubectl wait --for=condition=ready pod -l app=caddy -n chatbot --timeout=300s 2>/dev/null || true
 	@echo ""
-	@echo "Deleting..."
-	rm -rf node_modules package-lock.json .next out coverage playwright-report test-results
+	@echo "✅ All pods are ready!"
 	@echo ""
-	@echo "Done! Run 'make install-app' to reinstall."
+	@echo "📊 Current status:"
+	@kubectl get pods -n chatbot
+	@echo ""
+	@echo "🌐 Access your application at: http://app.domain.local"
+	@echo "⚠️  Don't forget to add '127.0.0.1 app.domain.local' to /etc/hosts"
 
-.PHONY: list-files
-list-files:
-	@echo "Listing all project files..."
-	@find . -type f ! -path "*/node_modules/*" ! -path "*/.next/*" ! -path "*/coverage/*" ! -path "*/playwright-report/*" ! -path "*/test-results/*" ! -path "*/venv/*" ! -path "*/__pycache__/*" ! -path "*/.DS_Store" ! -path "*/.git/*" ! -path "*/.gitignore" ! -path "*/.*.log" | sort
+down-kube: ## Remove deployment from Kubernetes
+	@echo "🛑 Removing deployment from Kubernetes..."
+	kubectl delete -k k8s/
+	@echo "✅ Deployment removed"
 
-# =============================================================================
-# USAGE NOTES
-# =============================================================================
-#
-# FIRST TIME:
-#   make install-app      (for dev only)
-#   make install-tests    (for dev + tests)
-#
-# DAILY DEV:
-#   make dev              (start coding - cache auto-cleaned)
-#   make test-unit        (quick tests - cache auto-cleaned)
-#
-# BEFORE COMMIT:
-#   make build            (verify build)
-#   make test             (all tests - cache auto-cleaned)
-#
-# IF BROKEN:
-#   make clean-test-cache (clear Jest cache)
-#   make reset            (fix 90% of issues)
-#
+status-kube: ## Show Kubernetes deployment status
+	@echo "📊 Namespace chatbot status:"
+	@echo ""
+	@echo "=== Pods ==="
+	@kubectl get pods -n chatbot -o wide
+	@echo ""
+	@echo "=== Services ==="
+	@kubectl get services -n chatbot
+	@echo ""
+	@echo "=== Ingress ==="
+	@kubectl get ingress -n chatbot
+	@echo ""
+	@echo "=== Persistent Volume Claims ==="
+	@kubectl get pvc -n chatbot
+
+logs-kube: ## Show logs from Kubernetes pods
+	@if [ -n "$(POD)" ]; then \
+		echo "📋 Logs for pod $(POD):"; \
+		kubectl logs -n chatbot $(POD) -f; \
+	elif [ -n "$(APP)" ]; then \
+		echo "📋 Logs for app $(APP):"; \
+		kubectl logs -n chatbot -l app=$(APP) -f --all-containers=true; \
+	else \
+		echo "📋 Available pods in chatbot namespace:"; \
+		kubectl get pods -n chatbot --no-headers -o custom-columns=":metadata.name"; \
+		echo ""; \
+		echo "Usage:"; \
+		echo "  make logs-kube POD=<pod-name>     - Show logs for specific pod"; \
+		echo "  make logs-kube APP=backend        - Show logs for all backend pods"; \
+		echo "  make logs-kube APP=frontend       - Show logs for all frontend pods"; \
+		echo "  make logs-kube APP=caddy          - Show logs for all caddy pods"; \
+	fi

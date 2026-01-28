@@ -1,6 +1,12 @@
 """
 Path: backend/src/core/config.py
-Version: 7
+Version: 8
+
+Changes in v8:
+- CRITICAL FIX: Added ARANGO_ROOT_USER and ARANGO_ROOT_PASSWORD fields
+- These fields enable database creation in Docker Compose mode
+- When provided, backend can create the database if it doesn't exist
+- When None, backend assumes database exists (Kubernetes mode)
 
 Changes in v7:
 - CRITICAL FIX: Made .env file loading optional (env_file_required=False)
@@ -78,6 +84,10 @@ class Settings(BaseSettings):
     ARANGO_DATABASE: str = "chatbot"
     ARANGO_USER: str = "root"
     ARANGO_PASSWORD: str = "changeme"
+    
+    # Root credentials for database creation (Docker Compose mode)
+    ARANGO_ROOT_USER: Optional[str] = None
+    ARANGO_ROOT_PASSWORD: Optional[str] = None
     
     # MongoDB (if DB_TYPE=mongo)
     MONGO_URI: Optional[str] = None

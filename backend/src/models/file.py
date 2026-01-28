@@ -1,16 +1,13 @@
 """
 Path: backend/src/models/file.py
-Version: 4.0
+Version: 4.1
+
+Changes in v4.1:
+- ADDED: status field to FileResponse for frontend compatibility
+- status is always "completed" for successfully uploaded files
+- Maintains all v4.0 features (scopes, processing, checksums, etc.)
 
 File models for upload/storage with contextual scopes and versioning.
-
-Changes in v4:
-- Added contextual scopes (system/user_global/user_project)
-- Added processing status with phases
-- Added checksums (MD5, SHA256, SimHash)
-- Added promotion tracking
-- Added active configuration for versions
-- Maintains backward compatibility with v3
 """
 
 from typing import Optional, Literal, Any
@@ -150,6 +147,12 @@ class FileResponse(CamelCaseModel):
     duplicate_detected: Optional[bool] = Field(
         default=False,
         description="Whether duplicate was detected during upload"
+    )
+    
+    # NEW in v4.1: Frontend compatibility
+    status: Literal["completed"] = Field(
+        default="completed",
+        description="File upload status (always 'completed' for returned files)"
     )
     
     class Config:

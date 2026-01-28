@@ -139,7 +139,7 @@ export default function Home() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b border-gray-200 flex items-center px-6">
-          <h1 className="text-lg font-semibold text-gray-900">AI Assistant</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Product CyberSecurity AI Assistant</h1>
         </header>
 
         <main className="flex-1 overflow-hidden">

@@ -1,6 +1,13 @@
 """
 Path: backend/src/api/routes/files.py
-Version: 4.0
+Version: 4.1
+
+Changes in v4.1:
+- CRITICAL FIX: list_files now returns { files: [...] } instead of { success, data, message }
+- Added FileListSimpleResponse for frontend compatibility
+- list_project_files also returns { files: [...] }
+- upload_file, get_file_info keep { success, data, message } format (different use case)
+- Maintains all v4.0 features (scopes, filters, download, delete)
 
 File upload/management endpoints with contextual scopes and versioning.
 
@@ -16,6 +23,7 @@ from typing import Optional, Literal
 from fastapi import APIRouter, Depends, UploadFile, File, Query, Response, status
 from fastapi.responses import StreamingResponse
 from beartype import beartype
+from pydantic import BaseModel
 
 from src.models.file import (
     FileUploadRequest,
@@ -37,8 +45,20 @@ class SingleFileResponse(SuccessResponse):
 
 
 class FileListResponse(SuccessResponse):
-    """File list response wrapper"""
+    """File list response wrapper (legacy - kept for backward compat)"""
     data: list[FileResponse]
+
+
+class FileListSimpleResponse(BaseModel):
+    """
+    Simple file list response - matches frontend expectations
+    
+    Frontend expects: { files: [...] }
+    NOT: { success, data, message }
+    
+    NEW in v4.1 for frontend compatibility
+    """
+    files: list[FileResponse]
 
 
 @beartype
@@ -80,6 +100,7 @@ async def upload_file(
     - Duplicate detection via SHA256 checksum
     
     **Returns:**
+    - Format: { success: true, data: {...}, message: "..." }
     - File metadata with processing status and presigned URL (valid 7 days)
     
     **Raises:**
@@ -110,7 +131,7 @@ async def upload_file(
 @beartype
 @router.get(
     "",
-    response_model=FileListResponse,
+    response_model=FileListSimpleResponse,
     summary="List files with filters"
 )
 async def list_files(
@@ -132,6 +153,10 @@ async def list_files(
     """
     List files with optional filters.
     
+    **IMPORTANT:** Changed in v4.1 for frontend compatibility!
+    - Returns: { files: [...] }
+    - Previously: { success, data, message }
+    
     **Access Control:**
     - System files: Visible to all users
     - User global files: Only visible to owner
@@ -146,9 +171,11 @@ async def list_files(
     - Files are sorted alphabetically by name
     
     **Returns:**
+    - Format: { files: [...] }
     - List of file metadata with presigned URLs (valid 7 days)
     - Includes processing status per phase
     - Includes active version configuration
+    - Each file includes status: "completed"
     """
     service = FileService(db=db)
     files = service.list_files(
@@ -159,9 +186,9 @@ async def list_files(
         search=search
     )
     
-    return FileListResponse(
-        data=[FileResponse(**f) for f in files],
-        message=f"Found {len(files)} file(s)"
+    # NEW in v4.1: Return simple format expected by frontend
+    return FileListSimpleResponse(
+        files=[FileResponse(**f) for f in files]
     )
 
 
@@ -185,6 +212,7 @@ async def get_file_info(
     - User project files: Accessible to project members
     
     **Returns:**
+    - Format: { success: true, data: {...}, message: "..." }
     - Complete file metadata
     - Processing status per phase
     - Active version configuration
@@ -297,7 +325,7 @@ async def delete_file(
 @beartype
 @router.get(
     "/projects/{project_id}",
-    response_model=FileListResponse,
+    response_model=FileListSimpleResponse,
     summary="List project files"
 )
 async def list_project_files(
@@ -319,6 +347,7 @@ async def list_project_files(
     - Only project members can view project files (TODO: implement)
     
     **Returns:**
+    - Format: { files: [...] } (changed in v4.1)
     - List of project files sorted alphabetically
     - Includes system files (visible to all)
     
@@ -334,7 +363,7 @@ async def list_project_files(
         search=search
     )
     
-    return FileListResponse(
-        data=[FileResponse(**f) for f in files],
-        message=f"Found {len(files)} file(s) for project"
+    # NEW in v4.1: Return simple format expected by frontend
+    return FileListSimpleResponse(
+        files=[FileResponse(**f) for f in files]
     )

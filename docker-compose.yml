@@ -1,59 +1,132 @@
-# path: docker-compose.yml
-# version: 5.2
-#
-# Changes in v5.2:
-# - FIXED: Frontend port mapping changed from 3000:80 to 3000:3000
-# - Reason: New Dockerfile uses Next.js standalone on port 3000, not Caddy on port 80
-#
-# Development environment ONLY
+# path: docker-compose.yaml
+# version: 1.0
+# Development environment with hot-reload
 
 services:
+  # Backend avec hot-reload
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: backend
+      dockerfile: Dockerfile.dev
+    container_name: chatbot-backend
     ports:
       - "8000:8000"
-    env_file:
-      - ./backend/.env
     environment:
-      # Docker-specific overrides (services use container names)
+      # Environment
+      - ENVIRONMENT=development
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_PREFIX=/api
+      
+      # Authentication
+      - AUTH_MODE=local
+      - JWT_SECRET=dev-secret-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
+      
+      # ArangoDB - Connection
       - ARANGO_HOST=arangodb
+      - ARANGO_PORT=8529
+      - ARANGO_DATABASE=chatbot
+      - ARANGO_USER=root
+      - ARANGO_PASSWORD=changeme
+      
+      # ArangoDB - Root credentials for DB creation
+      - ARANGO_ROOT_USER=root
+      - ARANGO_ROOT_PASSWORD=changeme
+      
+      # MinIO
+      - STORAGE_TYPE=minio
       - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_DEFAULT_BUCKET=chatbot-files
+      - MINIO_SECURE=false
+      
+      # LLM Provider
+      - LLM_PROVIDER=ollama
       - OLLAMA_BASE_URL=http://ollama:11434
-#    volumes:
-#      - ./backend/src:/app/src:ro
+      - OLLAMA_MODEL=tinyllama
+      
+      # Root User
+      - ROOT_USER_EMAIL=root@example.com
+      - ROOT_USER_PASSWORD=RootPass123
+      - ROOT_USER_NAME=Root User
+      
+      # CORS
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - CORS_CREDENTIALS=true
+      
+      # Logging
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount source for hot-reload
+      - ./backend/src:/app/src
+      # Keep dependencies in named volume (performance)
+      - backend-deps:/root/.local
     depends_on:
-      - arangodb
-      - minio
-      - ollama
+      arangodb:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - chatbot
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
+  # Frontend avec hot-reload
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: frontend
+      dockerfile: Dockerfile.dev
+    container_name: chatbot-frontend
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:8000
-#    volumes:
-#      - ./frontend/src:/app/src:ro
-#      - ./frontend/public:/app/public:ro
+      - NEXT_TELEMETRY_DISABLED=1
+      # Enable hot-reload for Docker
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      # Mount source for hot-reload
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/tests:/app/tests
+      # Config files (read-only)
+      - ./frontend/next.config.js:/app/next.config.js:ro
+      - ./frontend/tsconfig.json:/app/tsconfig.json:ro
+      - ./frontend/Tailwind.config.ts:/app/Tailwind.config.ts:ro
+      - ./frontend/postcss.config.js:/app/postcss.config.js:ro
+      # Keep dependencies in named volume (performance)
+      - frontend-deps:/app/node_modules
+      - frontend-next:/app/.next
     depends_on:
       - backend
     networks:
       - chatbot
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
+  # ArangoDB
   arangodb:
     image: arangodb:latest
-    container_name: arangodb
+    container_name: chatbot-arangodb
     environment:
       - ARANGO_ROOT_PASSWORD=changeme
     ports:
@@ -63,10 +136,17 @@ services:
     networks:
       - chatbot
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8529/_admin/server/availability"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
+  # MinIO
   minio:
     image: minio/minio:latest
-    container_name: minio
+    container_name: chatbot-minio
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -79,10 +159,17 @@ services:
     networks:
       - chatbot
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
+  # Ollama
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
+    container_name: chatbot-ollama
     ports:
       - "11434:11434"
     volumes:
@@ -91,11 +178,85 @@ services:
       - chatbot
     restart: unless-stopped
 
+  # Ollama Init - Pull tinyllama model automatically
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: chatbot-ollama-init
+    depends_on:
+      - ollama
+    networks:
+      - chatbot
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "⏳ Waiting for Ollama to be ready..."
+        echo "   Target: $OLLAMA_HOST"
+        echo ""
+        
+        attempt=0
+        max_attempts=60
+        
+        while [ $attempt -lt $max_attempts ]; do
+          attempt=$((attempt + 1))
+          echo "🔄 Attempt $attempt/$max_attempts - Checking Ollama status..."
+          
+          # Try to list models (will fail if Ollama not ready)
+          if ollama list > /dev/null 2>&1; then
+            echo "   ✅ Connection successful"
+            echo ""
+            echo "✅ Ollama is ready!"
+            break
+          else
+            echo "   ⏳ Connection refused or timeout"
+            echo "   Waiting 2 seconds..."
+            echo ""
+            sleep 2
+          fi
+          
+          if [ $attempt -eq $max_attempts ]; then
+            echo "❌ Failed to connect to Ollama after $max_attempts attempts"
+            exit 1
+          fi
+        done
+        
+        echo ""
+        echo "🔍 Checking if tinyllama model exists..."
+        
+        # List current models
+        echo "📋 Current models:"
+        ollama list
+        echo ""
+        
+        if ollama list | grep -q tinyllama; then
+          echo "✅ tinyllama model already exists"
+        else
+          echo "📥 Pulling tinyllama model (this may take a few minutes)..."
+          echo "   Size: ~636 MB"
+          echo ""
+          ollama pull tinyllama
+          echo ""
+          echo "✅ tinyllama model pulled successfully"
+        fi
+        
+        echo ""
+        echo "📋 Final model list:"
+        ollama list
+        echo ""
+        echo "✅ Ollama initialization complete"
+    restart: "no"
+
 networks:
   chatbot:
     driver: bridge
 
 volumes:
+  # Data volumes (persistent across restarts)
   arangodb-data:
   minio-data:
   ollama-data:
+  # Dependency volumes (keep installed packages)
+  backend-deps:
+  frontend-deps:
+  frontend-next:

@@ -1,5 +1,13 @@
 # path: Makefile
-# version: 6.3
+# version: 8.0
+# Changes in v8.0:
+# - Added automatic Next.js cache cleanup in dev-up and dev-build
+# - Prevents 422 errors after updating frontend code
+# - Ensures fresh compilation on startup and rebuild
+# Changes in v7.0:
+# - Added dev-up, dev-down, dev-logs, dev-restart for development workflow
+# - Simplified commands: just "make dev-up" to start development environment
+# - Uses docker-compose.yaml (single file for dev)
 # Changes in v6.3:
 # - Added automatic patch for nginx ingress controller after installation
 # - Enables snippet annotations for custom nginx configuration
@@ -10,146 +18,143 @@
 # - up-kube now builds images before deploying
 # - Added REGISTRY and IMAGE_TAG variables for image configuration
 #
-# Development environment: Docker Compose
-# Production: k8s
+# Development environment: Docker Compose (docker-compose.yaml)
+# Production: Kubernetes (k8s/)
 
-# k8s image configuration
+# Kubernetes image configuration
 REGISTRY ?= localhost:5000
 IMAGE_TAG ?= latest
 BACKEND_IMAGE = $(REGISTRY)/chatbot-backend:$(IMAGE_TAG)
 FRONTEND_IMAGE = $(REGISTRY)/chatbot-frontend:$(IMAGE_TAG)
 
-.PHONY: help up down logs clean rebuild rebuild-frontend rebuild-backend rebuild-all clean-images
+.PHONY: help dev-up dev-down dev-logs dev-restart dev-build dev-clean dev-shell-backend dev-shell-frontend
 .PHONY: up-kube down-kube logs-kube status-kube build-images-kube install-ingress-kube
 
 .DEFAULT_GOAL := help
 
 help: ## Show help
-
-	@echo "Development Commands (Docker Compose):"
-	@echo "  make up                  - Start services"
-	@echo "  make down                - Stop services"
-	@echo "  make logs                - Show logs"
-	@echo "  make restart             - Restart services"
-	@echo "  make clean               - Remove containers"
-	@echo "  make rebuild             - Rebuild frontend + backend (delete old images + no cache)"
-	@echo "  make rebuild-frontend    - Rebuild frontend only (delete old image + no cache)"
-	@echo "  make rebuild-backend     - Rebuild backend only (delete old image + no cache)"
-	@echo "  make rebuild-all         - Rebuild all services (delete old images + no cache)"
-	@echo "  make clean-images        - Remove all project images"
 	@echo ""
-	@echo "k8s Commands:"
-	@echo "  make install-ingress-kube - Install NGINX Ingress Controller v1.14.1"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  🚀 Development Commands (Docker Compose)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  make dev-up              - Start all services (hot-reload enabled)"
+	@echo "  make dev-down            - Stop all services"
+	@echo "  make dev-logs            - Show logs (all services)"
+	@echo "  make dev-restart         - Restart all services"
+	@echo "  make dev-build           - Rebuild images"
+	@echo "  make dev-clean           - Stop services and remove volumes"
+	@echo "  make dev-shell-backend   - Open shell in backend container"
+	@echo "  make dev-shell-frontend  - Open shell in frontend container"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  ☸️  Kubernetes Commands (Production)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  make install-ingress-kube - Install NGINX Ingress Controller"
 	@echo "  make build-images-kube   - Build Docker images for k8s"
 	@echo "  make up-kube             - Build images + Deploy to k8s"
 	@echo "  make down-kube           - Remove from k8s"
 	@echo "  make status-kube         - Show k8s deployment status"
 	@echo "  make logs-kube           - Show k8s pod logs"
 	@echo ""
-	@echo "k8s Configuration:"
-	@echo "  REGISTRY=<registry>      - Docker registry (default: localhost:5000)"
-	@echo "  IMAGE_TAG=<tag>          - Image tag (default: latest)"
-	@echo "  Example: make up-kube REGISTRY=myregistry.io IMAGE_TAG=v1.0.0"
-	@echo ""
-	@echo "URLs (Docker Compose):"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  🌐 URLs (Development)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Frontend:  http://localhost:3000"
 	@echo "  Backend:   http://localhost:8000"
 	@echo "  API Docs:  http://localhost:8000/docs"
 	@echo "  ArangoDB:  http://localhost:8529 (root/changeme)"
 	@echo "  MinIO:     http://localhost:9001 (minioadmin/minioadmin)"
 	@echo ""
-	@echo "URLs (k8s):"
-	@echo "  Application: http://app.domain.local (configure /etc/hosts)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  📝 Quick Start"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  1. Copy backend/.env.example to backend/.env"
+	@echo "  2. Run: make dev-up"
+	@echo "  3. Edit code in backend/src/ or frontend/src/"
+	@echo "  4. See changes automatically!"
 	@echo ""
 
 # =============================================================================
-# Docker Compose Commands
+# Development Commands (Docker Compose)
 # =============================================================================
 
-up: ## Start services
-	docker-compose up -d
-	@echo "✅ Services started"
-
-down: ## Stop services
-	docker-compose down
-
-logs: ## Show logs
-	docker-compose logs -f
-
-restart: ## Restart services
-	docker-compose restart
-
-clean: ## Remove containers and volumes
-	docker-compose down -v
-
-rebuild: ## Rebuild frontend + backend (delete old images + no cache)
-	@echo "🛑 Stopping frontend and backend..."
-	@docker-compose stop frontend backend
-	@echo "🗑️  Removing frontend and backend containers..."
-	@docker-compose rm -f frontend backend
-	@echo "🗑️  Removing frontend and backend images..."
-	@docker rmi simplehybridchat-main-backend:latest 2>/dev/null || echo "No backend image found"
-	@docker rmi simplehybridchat-main-frontend:latest 2>/dev/null || echo "No frontend image found"
-	@echo "🔨 Building frontend and backend (no cache)..."
-	@docker-compose build --no-cache backend
-	@docker-compose build --no-cache frontend
-	@echo "🚀 Starting frontend and backend..."
-	@docker-compose up -d frontend backend
-	@echo "✅ Frontend and backend rebuilt successfully"
-	@echo "📋 Checking logs (wait 3 seconds)..."
-	@sleep 3
-	@docker-compose logs --tail=30 backend frontend
-
-rebuild-frontend: ## Rebuild frontend only (delete old image + no cache)
-	@echo "🛑 Stopping frontend..."
-	@docker-compose stop frontend
-	@echo "🗑️  Removing frontend container..."
-	@docker-compose rm -f frontend
-	@echo "🗑️  Removing frontend image..."
-	@docker rmi simplehybridchat-main-frontend:latest 2>/dev/null || echo "No frontend image found"
-	@echo "🔨 Building frontend (no cache)..."
-	@docker-compose build --no-cache frontend
-	@echo "🚀 Starting frontend..."
-	@docker-compose up -d frontend
-	@echo "✅ Frontend rebuilt successfully"
-	@echo "📋 Checking logs (wait 3 seconds)..."
-	@sleep 3
-	@docker-compose logs --tail=30 frontend
-
-rebuild-backend: ## Rebuild backend only (delete old image + no cache)
-	@echo "🛑 Stopping backend..."
-	@docker-compose stop backend
-	@echo "🗑️  Removing backend container..."
-	@docker-compose rm -f backend
-	@echo "🗑️  Removing backend image..."
-	@docker rmi simplehybridchat-main-backend:latest 2>/dev/null || echo "No backend image found"
-	@echo "🔨 Building backend (no cache)..."
-	@docker-compose build --no-cache backend
-	@echo "🚀 Starting backend..."
-	@docker-compose up -d backend
-	@echo "✅ Backend rebuilt successfully"
-	@echo "📋 Checking logs (wait 3 seconds)..."
-	@sleep 3
-	@docker-compose logs --tail=30 backend
-
-rebuild-all: ## Rebuild all services (delete old images + no cache)
-	@echo "🛑 Stopping all services..."
-	@docker-compose down
-	@echo "🗑️  Removing all project images..."
-	@docker images --filter "reference=simplehybridchat*" --format "{{.ID}}" | xargs -r docker rmi -f
-	@echo "🔨 Building all services (no cache)..."
-	@docker-compose build --no-cache
-	@echo "🚀 Starting all services..."
+dev-up: ## Start development environment
+	@echo "🚀 Starting development environment..."
+	@if [ ! -f backend/.env ]; then \
+		echo "⚠️  backend/.env not found"; \
+		if [ -f backend/env.example ]; then \
+			echo "📝 Creating backend/.env from env.example..."; \
+			cp backend/env.example backend/.env; \
+			echo "✅ Created backend/.env"; \
+		else \
+			echo "❌ backend/env.example not found"; \
+			echo "Please create backend/.env manually"; \
+			exit 1; \
+		fi \
+	fi
+	@echo "🧹 Cleaning Next.js cache..."
+	@rm -rf frontend/.next 2>/dev/null || true
 	@docker-compose up -d
-	@echo "✅ All services rebuilt successfully"
+	@echo "🔄 Removing Next.js cache in container..."
+	@sleep 2
+	@docker-compose exec -T frontend rm -rf /app/.next 2>/dev/null || true
+	@docker-compose restart frontend 2>/dev/null || true
+	@echo "✅ Services started"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 Access your application:"
+	@echo "   Frontend:  http://localhost:3000"
+	@echo "   Backend:   http://localhost:8000"
+	@echo "   API Docs:  http://localhost:8000/docs"
+	@echo "   ArangoDB:  http://localhost:8529"
+	@echo "   MinIO:     http://localhost:9001"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "💡 Hot-reload is enabled:"
+	@echo "   • Edit backend/src/ → Backend restarts automatically"
+	@echo "   • Edit frontend/src/ → Browser reloads automatically"
+	@echo ""
+	@echo "📋 View logs: make dev-logs"
+	@echo ""
 
-clean-images: ## Remove all project images
-	@echo "🗑️  Removing all project images..."
-	@docker images --filter "reference=simplehybridchat*" --format "{{.ID}}" | xargs -r docker rmi -f
-	@echo "✅ Images removed"
+dev-down: ## Stop development environment
+	@echo "🛑 Stopping development environment..."
+	@docker-compose down
+	@echo "✅ Services stopped"
+
+dev-logs: ## Show logs from all services
+	@docker-compose logs -f
+
+dev-restart: ## Restart all services
+	@echo "🔄 Restarting services..."
+	@docker-compose restart
+	@echo "✅ Services restarted"
+
+dev-build: ## Rebuild development images
+	@echo "🔨 Rebuilding development images..."
+	@echo "🧹 Cleaning Next.js cache..."
+	@rm -rf frontend/.next 2>/dev/null || true
+	@docker-compose build --no-cache
+	@echo "🔄 Starting services to clean container cache..."
+	@docker-compose up -d
+	@sleep 2
+	@docker-compose exec -T frontend rm -rf /app/.next 2>/dev/null || true
+	@docker-compose restart frontend 2>/dev/null || true
+	@echo "✅ Images rebuilt and cache cleaned"
+
+dev-clean: ## Stop services and remove volumes
+	@echo "🧹 Cleaning development environment..."
+	@docker-compose down -v
+	@echo "✅ Cleaned (containers and volumes removed)"
+
+dev-shell-backend: ## Open shell in backend container
+	@docker-compose exec backend /bin/bash
+
+dev-shell-frontend: ## Open shell in frontend container
+	@docker-compose exec frontend /bin/sh
 
 # =============================================================================
-# k8s Commands
+# Kubernetes Commands (Production)
 # =============================================================================
 
 install-ingress-kube: ## Install NGINX Ingress Controller v1.14.1
@@ -191,7 +196,7 @@ install-ingress-kube: ## Install NGINX Ingress Controller v1.14.1
 	@echo "⚠️  Note: This project will be retired in March 2026"
 	@echo "    Consider migrating to Gateway API or F5 NGINX Ingress Controller"
 
-build-images-kube: ## Build Docker images for k8s
+build-images-kube: ## Build Docker images for Kubernetes
 	@echo "🔨 Building backend image: $(BACKEND_IMAGE)"
 	docker build -t $(BACKEND_IMAGE) ./backend
 	@echo "✅ Backend image built"
@@ -210,7 +215,7 @@ build-images-kube: ## Build Docker images for k8s
 		echo "  docker push $(FRONTEND_IMAGE)"; \
 	fi
 
-up-kube: build-images-kube ## Build images + Deploy to k8s using kustomization.yaml
+up-kube: build-images-kube ## Build images + Deploy to Kubernetes
 	@echo ""
 	@echo "🔄 Updating deployment images..."
 	@sed -i.bak "s|image:.*chatbot-backend:.*|image: $(BACKEND_IMAGE)|g" k8s/backend/deployment.yaml
@@ -218,7 +223,7 @@ up-kube: build-images-kube ## Build images + Deploy to k8s using kustomization.y
 	@rm -f k8s/backend/deployment.yaml.bak k8s/frontend/deployment.yaml.bak
 	@echo "✅ Deployment images updated"
 	@echo ""
-	@echo "🚀 Deploying to k8s..."
+	@echo "🚀 Deploying to Kubernetes..."
 	kubectl apply -k k8s/
 	@echo "✅ Deployment completed"
 	@echo ""
@@ -234,17 +239,17 @@ up-kube: build-images-kube ## Build images + Deploy to k8s using kustomization.y
 	@echo "✅ All pods are ready!"
 	@echo ""
 	@echo "📊 Current status:"
-	@kubectl get pods -n chatbotmake 
+	@kubectl get pods -n chatbot
 	@echo ""
 	@echo "🌐 Access your application at: http://app.domain.local"
 	@echo "⚠️  Don't forget to add '127.0.0.1 app.domain.local' to /etc/hosts"
 
-down-kube: ## Remove deployment from k8s
-	@echo "🛑 Removing deployment from k8s..."
+down-kube: ## Remove deployment from Kubernetes
+	@echo "🛑 Removing deployment from Kubernetes..."
 	kubectl delete -k k8s/
 	@echo "✅ Deployment removed"
 
-status-kube: ## Show k8s deployment status
+status-kube: ## Show Kubernetes deployment status
 	@echo "📊 Namespace chatbot status:"
 	@echo ""
 	@echo "=== Pods ==="
@@ -259,7 +264,7 @@ status-kube: ## Show k8s deployment status
 	@echo "=== Persistent Volume Claims ==="
 	@kubectl get pvc -n chatbot
 
-logs-kube: ## Show logs from k8s pods (use POD=<name> or APP=<app-label>)
+logs-kube: ## Show logs from Kubernetes pods
 	@if [ -n "$(POD)" ]; then \
 		echo "📋 Logs for pod $(POD):"; \
 		kubectl logs -n chatbot $(POD) -f; \

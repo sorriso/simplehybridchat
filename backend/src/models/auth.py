@@ -1,19 +1,18 @@
 """
 Path: backend/src/models/auth.py
-Version: 4.0
+Version: 5.0
+
+Changes in v5.0:
+- SECURITY: LoginRequest accepts password_hash (SHA256) instead of password
+- SECURITY: RegisterRequest accepts password_hash (SHA256) instead of password
+- Frontend computes SHA256 client-side before transmission
+- Backend receives SHA256 hash and stores bcrypt(SHA256)
+- Never receives or stores plaintext passwords
 
 Changes in v4.0:
 - CLEAN AUTHENTICATION: Only 'email' field, no 'username' permissiveness
 - Use EmailStr validation for proper email format enforcement
 - Clear error messages for invalid email format
-- Removed username/email compatibility layer (no bidouillage)
-
-Changes in v3.0:
-- FRONTEND COMPATIBILITY: LoginRequest accepts both 'email' and 'username'
-- FRONTEND COMPATIBILITY: Add ConfigResponse for /config endpoint
-- FRONTEND COMPATIBILITY: Add LoginResponse for /login endpoint
-
-Authentication models and schemas
 """
 
 from typing import Optional
@@ -25,36 +24,32 @@ from src.models.user import UserResponse
 
 class LoginRequest(BaseModel):
     """
-    Login credentials
+    Login credentials with SHA256 pre-hashed password
     
-    CLEAN IMPLEMENTATION: Only accepts email (RFC-compliant format)
-    No username field, no permissiveness, strict validation.
+    SECURITY MODEL:
+    - Frontend: password → SHA256 → password_hash (64 hex chars)
+    - Backend: receives password_hash → bcrypt(password_hash) → compare
+    - Never receives plaintext password
     
     Valid email examples:
     - user@example.com
     - admin@company.local
     - root@server.domain.com
-    
-    Invalid formats (will return 422 with clear error):
-    - root@localhost (localhost not a valid domain)
-    - user123 (not an email)
-    - admin (not an email)
     """
     email: EmailStr = Field(..., description="User email address (RFC-compliant format)")
-    password: str = Field(..., min_length=1, description="User password")
+    password_hash: str = Field(
+        ..., 
+        description="SHA256 hash of password (computed client-side)",
+        min_length=64,
+        max_length=64
+    )
     
     @field_validator('email')
     @classmethod
     def validate_email_format(cls, v: EmailStr) -> EmailStr:
-        """
-        Additional email validation with clear error messages
-        
-        Pydantic EmailStr already validates RFC format, but we add
-        custom error message for better frontend UX.
-        """
+        """Validate email format with clear error messages"""
         email_str = str(v)
         
-        # Check for common mistakes
         if '@' not in email_str:
             raise ValueError("Email must contain '@' symbol")
         
@@ -73,10 +68,22 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    """User registration request"""
+    """
+    User registration request with SHA256 pre-hashed password
+    
+    SECURITY MODEL:
+    - Frontend: password → SHA256 → password_hash (64 hex chars)
+    - Backend: receives password_hash → bcrypt(password_hash) → store
+    - Never receives plaintext password
+    """
     name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr = Field(..., description="User email address (RFC-compliant format)")
-    password: str = Field(..., min_length=8, max_length=100)
+    password_hash: str = Field(
+        ..., 
+        description="SHA256 hash of password (computed client-side)",
+        min_length=64,
+        max_length=64
+    )
     first_name: Optional[str] = Field(None, min_length=1, max_length=50)
     last_name: Optional[str] = Field(None, min_length=1, max_length=50)
     
@@ -111,12 +118,12 @@ class TokenResponse(CamelCaseModel):
     """
     access_token: str
     token_type: str = "bearer"
-    expires_in: int  # seconds
+    expires_in: int
 
 
 class LoginResponse(BaseModel):
     """
-    FRONTEND COMPATIBILITY: Login response wrapper
+    Login response wrapper
     
     Frontend expects:
     {
@@ -130,10 +137,10 @@ class LoginResponse(BaseModel):
 
 class TokenPayload(BaseModel):
     """JWT token payload (internal, not returned to client)"""
-    sub: str  # user_id
+    sub: str
     email: str
     role: str
-    exp: int  # expiration timestamp
+    exp: int
 
 
 class LogoutRequest(BaseModel):
@@ -181,7 +188,7 @@ class AuthConfigData(CamelCaseModel):
     - maintenance_mode → maintenanceMode
     - sso_config → ssoConfig
     """
-    mode: str  # "none", "local", "sso"
+    mode: str
     allow_multi_login: bool
     maintenance_mode: bool
     sso_config: Optional[SsoConfigData] = None
@@ -189,7 +196,7 @@ class AuthConfigData(CamelCaseModel):
 
 class ConfigResponse(BaseModel):
     """
-    FRONTEND COMPATIBILITY: Config response wrapper
+    Config response wrapper
     
     Frontend expects:
     {

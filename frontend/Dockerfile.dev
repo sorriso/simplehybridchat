@@ -1,0 +1,38 @@
+# path: frontend/Dockerfile.dev
+# version: 1.0
+# Development Dockerfile with hot-reload
+# Simplified version of production Dockerfile (frontend/Dockerfile v2)
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies for native modules
+RUN apk add --no-cache libc6-compat
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy config files
+COPY next.config.js tsconfig.json ./
+COPY Tailwind.config.ts postcss.config.js ./
+
+# Copy source code (will be overridden by volume mount)
+COPY src/ ./src/
+COPY public/ ./public/
+COPY tests/ ./tests/
+
+# Expose port
+EXPOSE 3000
+
+# Set environment to development
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+
+# Development: Next.js dev server with hot-reload
+CMD ["npm", "run", "dev"]

@@ -1,5 +1,11 @@
 /* path: frontend/src/components/upload/FileUploadPanel.tsx
-   version: 1 */
+   version: 2.0
+   
+   Changes in v2.0:
+   - WIDER sidebar: w-96 (384px) → w-[520px] (520px) for better readability
+   - More compact padding and spacing
+   - Cleaner, modern design
+*/
 
 import { X } from "lucide-react";
 import { FileDropzone } from "./FileDropzone";
@@ -53,16 +59,16 @@ export function FileUploadPanel({ isOpen, onClose }: FileUploadPanelProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl border-l border-gray-200 z-40">
+    <div className="fixed right-0 top-0 h-full w-[520px] bg-white shadow-xl border-l border-gray-200 z-40">
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Upload Files</h2>
-          <IconButton icon={X} onClick={onClose} title="Close" />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-900">Upload Files</h2>
+          <IconButton icon={X} onClick={onClose} title="Close" size="sm" />
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
           {/* Dropzone */}
           <FileDropzone
             onFilesSelected={handleFilesSelected}
@@ -80,7 +86,7 @@ export function FileUploadPanel({ isOpen, onClose }: FileUploadPanelProps) {
 
         {/* Footer actions */}
         {pendingFiles.length > 0 && (
-          <div className="p-4 border-t border-gray-200 space-y-2">
+          <div className="px-4 py-3 border-t border-gray-200 space-y-2 bg-gray-50">
             <Button
               variant="primary"
               fullWidth

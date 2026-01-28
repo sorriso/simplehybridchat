@@ -1,11 +1,13 @@
 /* path: frontend/src/components/sidebar/ConversationItem.tsx
-   version: 7
+   version: 8.0
    
-   Changes in v7:
-   - ADDED: onShare prop for sharing conversations
-   - ADDED: readOnly prop to disable drag/delete/rename for shared conversations
-   - ADDED: Share option in context menu (when not readOnly)
-   - Reason: Support shared conversations display with proper restrictions
+   Changes in v8.0:
+   - COMPACT DESIGN: Reduced padding (py-2.5 → py-1.5)
+   - SMALLER FONTS: Title (text-sm → text-xs), Messages count (text-xs → text-[11px])
+   - SMALLER ICONS: 18px → 16px (MessageSquare), 16px → 14px (GripVertical)
+   - ADDED: onUngroup prop to remove conversation from group
+   - ADDED: "Remove from group" option in context menu (only if conversation is in a group)
+   - Better space efficiency without losing readability
 */
 
 import {
@@ -14,6 +16,7 @@ import {
   Edit2,
   GripVertical,
   Share2,
+  FolderX,
 } from "lucide-react";
 import { Conversation } from "@/types/conversation";
 import { ContextMenu } from "../ui/ContextMenu";
@@ -26,15 +29,13 @@ interface ConversationItemProps {
   onDelete: () => void;
   onRename: () => void;
   onShare?: () => void;
+  onUngroup?: () => void; // NEW: Remove from group
   onDragStart?: (conversationId: string) => void;
   onDragEnd?: () => void;
   isDragging?: boolean;
   readOnly?: boolean;
 }
 
-/**
- * Single conversation item in the sidebar with drag functionality
- */
 export function ConversationItem({
   conversation,
   isActive,
@@ -42,39 +43,52 @@ export function ConversationItem({
   onDelete,
   onRename,
   onShare,
+  onUngroup,
   onDragStart,
   onDragEnd,
   isDragging = false,
   readOnly = false,
 }: ConversationItemProps) {
-  // Build context menu items based on readOnly state
+  // Check if conversation is in a group
+  const isInGroup = !!conversation.groupId;
+
   const contextMenuItems = readOnly
-    ? [] // No context menu for read-only conversations
+    ? []
     : [
         ...(onShare
           ? [
               {
                 label: "Share",
                 onClick: onShare,
-                icon: <Share2 size={16} />,
+                icon: <Share2 size={14} />,
+              },
+            ]
+          : []),
+        // NEW: Add "Remove from group" if conversation is in a group
+        ...(isInGroup && onUngroup
+          ? [
+              {
+                label: "Remove from group",
+                onClick: onUngroup,
+                icon: <FolderX size={14} />,
               },
             ]
           : []),
         {
           label: "Rename",
           onClick: onRename,
-          icon: <Edit2 size={16} />,
+          icon: <Edit2 size={14} />,
         },
         {
           label: "Delete",
           onClick: onDelete,
-          icon: <Trash2 size={16} />,
+          icon: <Trash2 size={14} />,
           variant: "danger" as const,
         },
       ];
 
   const handleDragStart = (e: React.DragEvent) => {
-    if (readOnly) return; // Prevent dragging read-only conversations
+    if (readOnly) return;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("conversationId", conversation.id);
     onDragStart?.(conversation.id);
@@ -99,28 +113,24 @@ export function ConversationItem({
         <button
           onClick={onClick}
           className={clsx(
-            "w-full px-3 py-2.5 rounded-lg text-left",
-            "flex items-center gap-3 transition-all duration-150",
+            "w-full px-2.5 py-1.5 rounded-lg text-left",
+            "flex items-center gap-2.5 transition-all duration-150",
             "border-l-4",
             {
-              // Active state - bleu pastel visible
-              "bg-blue-50 border-blue-400 text-blue-900 shadow-md ring-1 ring-blue-200":
-                isActive,
-              // Inactive state
+              "bg-blue-50 border-blue-400 text-blue-900 shadow-sm ring-1 ring-blue-200": isActive,
               "border-transparent text-gray-700 hover:bg-gray-100": !isActive,
             },
           )}
         >
-          {/* Drag handle - hidden for read-only */}
           {!readOnly && (
             <GripVertical
-              size={16}
+              size={14}
               className="flex-shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
             />
           )}
 
           <MessageSquare
-            size={18}
+            size={16}
             className={clsx(
               "flex-shrink-0",
               isActive ? "text-blue-500" : "text-gray-600",
@@ -129,7 +139,7 @@ export function ConversationItem({
           <div className="flex-1 min-w-0">
             <p
               className={clsx(
-                "text-sm font-medium truncate",
+                "text-xs font-medium truncate leading-tight",
                 isActive && "font-semibold",
               )}
             >
@@ -137,7 +147,7 @@ export function ConversationItem({
             </p>
             <p
               className={clsx(
-                "text-xs truncate",
+                "text-[11px] truncate leading-tight mt-0.5",
                 isActive ? "text-blue-600" : "text-gray-500",
               )}
             >
