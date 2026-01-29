@@ -1,28 +1,35 @@
 """
 Path: backend/tests/integration/api/test_admin_routes_integration.py
-Version: 4.0
+Version: 5.0
+
+Changes in v5.0:
+- FIX: Use password_hash instead of password in login requests
+- Added compute_password_hash() helper for SHA256 hashing
+- Store bcrypt(SHA256) in DB, send SHA256 to login API
 
 Changes in v4.0:
 - FIX: test_verify_token_valid uses ["user"] for /api/auth/verify response
-- Route /verify returns SingleUserResponse format {user: {...}}
-
-Changes in v3.0:
-- FIX: Use ["data"] instead of ["user"] for admin routes responses
-- Routes return SuccessResponse format {success, data}
-
-Changes in v1.1:
-- FIX: test_generic_user_in_local_mode now accepts 403 status code
-- /api/auth/generic returns 403 in local mode (not 404)
 
 Integration tests for admin routes
 """
 
 import pytest
+import hashlib
 from datetime import datetime
 from fastapi.testclient import TestClient
 
 from src.core.security import hash_password
 from src.services.admin_service import AdminService
+
+
+def compute_password_hash(password: str) -> str:
+    """Compute SHA256 hash of password (simulates frontend)"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# Pre-computed SHA256 hashes
+ROOT_PASS_HASH = compute_password_hash("rootpass")
+USER_PASS_HASH = compute_password_hash("userpass")
 
 
 @pytest.fixture(autouse=True)
@@ -42,7 +49,6 @@ def client(arango_container_function):
     
     db = arango_container_function
     
-    # Create collections
     if not db.collection_exists("users"):
         db.create_collection("users")
     
@@ -56,7 +62,7 @@ def root_user(arango_container_function):
     return db.create("users", {
         "name": "Root User",
         "email": "root@example.com",
-        "password_hash": hash_password("rootpass"),
+        "password_hash": hash_password(ROOT_PASS_HASH),
         "role": "root",
         "status": "active",
         "group_ids": [],
@@ -72,7 +78,7 @@ def regular_user(arango_container_function):
     return db.create("users", {
         "name": "Regular User",
         "email": "user@example.com",
-        "password_hash": hash_password("userpass"),
+        "password_hash": hash_password(USER_PASS_HASH),
         "role": "user",
         "status": "active",
         "group_ids": [],
@@ -86,9 +92,9 @@ def root_headers(client, root_user):
     """Get authentication headers for root"""
     response = client.post("/api/auth/login", json={
         "email": "root@example.com",
-        "password": "rootpass"
+        "password_hash": ROOT_PASS_HASH
     })
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Login failed: {response.text}"
     token = response.json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -98,9 +104,9 @@ def user_headers(client, regular_user):
     """Get authentication headers for regular user"""
     response = client.post("/api/auth/login", json={
         "email": "user@example.com",
-        "password": "userpass"
+        "password_hash": USER_PASS_HASH
     })
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Login failed: {response.text}"
     token = response.json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -133,14 +139,12 @@ class TestMaintenanceMode:
     
     def test_toggle_maintenance_disable(self, client, root_headers):
         """Test disable maintenance mode"""
-        # Enable first
         client.post(
             "/api/admin/maintenance",
             json={"enabled": True},
             headers=root_headers
         )
         
-        # Disable
         response = client.post(
             "/api/admin/maintenance",
             json={"enabled": False},
@@ -157,7 +161,6 @@ class TestSessionsManagement:
     
     def test_list_sessions_as_root(self, client, root_headers, user_headers):
         """Test root can list all sessions"""
-        # Create some sessions by logging in
         response = client.get("/api/auth/sessions", headers=root_headers)
         
         assert response.status_code == 200
@@ -228,10 +231,6 @@ class TestAuthEndpoints:
     def test_verify_token_missing(self, client):
         """Test verify without token"""
         response = client.get("/api/auth/verify")
-        
-        # Depends on AUTH_MODE setting
-        # In mode "local" or "sso": should return 401
-        # In mode "none": might return generic user
         assert response.status_code in [200, 401]
 
 
@@ -240,12 +239,7 @@ class TestGenericUser:
     
     def test_generic_user_in_local_mode(self, client):
         """Test generic user endpoint not available in local mode"""
-        # Assuming AUTH_MODE=local in tests
         response = client.get("/api/auth/generic")
-        
-        # Should return 403 (forbidden) in local mode
-        # OR 200 if AUTH_MODE=none
-        # OR 401 if middleware requires auth
         assert response.status_code in [200, 401, 403]
 
 
@@ -254,7 +248,6 @@ class TestMaintenanceModeEnforcement:
     
     def test_maintenance_mode_blocks_regular_user(self, client, root_headers, user_headers):
         """Test maintenance mode blocks regular users"""
-        # Enable maintenance mode
         response = client.post(
             "/api/admin/maintenance",
             json={"enabled": True},
@@ -262,17 +255,11 @@ class TestMaintenanceModeEnforcement:
         )
         assert response.status_code == 200
         
-        # Regular user should be blocked
-        # Note: This depends on middleware implementation
-        # If middleware is implemented, this would return 503
         response = client.get("/api/auth/me", headers=user_headers)
-        
-        # Might be 503 or 200 depending on middleware implementation
         assert response.status_code in [200, 503]
     
     def test_maintenance_mode_allows_root(self, client, root_headers):
         """Test maintenance mode allows root users"""
-        # Enable maintenance mode
         response = client.post(
             "/api/admin/maintenance",
             json={"enabled": True},
@@ -280,6 +267,5 @@ class TestMaintenanceModeEnforcement:
         )
         assert response.status_code == 200
         
-        # Root should still have access
         response = client.get("/api/auth/me", headers=root_headers)
         assert response.status_code == 200

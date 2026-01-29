@@ -1,49 +1,45 @@
 """
 Path: backend/tests/integration/api/test_auth_routes_integration.py
-Version: 7.0
+Version: 9.0
 
-Changes in v7.0:
-- FIX: Use ["data"] instead of ["user"] for /auth/me responses
-- Route /auth/me returns SuccessResponse format {success, data}
+Changes in v9.0:
+- FIX CRITICAL: Use password_hash (SHA256) instead of password for all API calls
+- LoginRequest requires password_hash (64 hex chars), not password
+- RegisterRequest requires password_hash (64 hex chars), not password
+- Added compute_password_hash() helper function
 
-Changes in v6.0:
-- FRONTEND COMPATIBILITY: Updated for new auth response formats
-- /login returns {token, user} instead of {success, data: {accessToken, ...}}
-- /config returns {config: {...}} instead of {success, data: {...}}
-- /verify and /me return {user: {...}} instead of {success, data: {...}}
+Changes in v8.0:
+- FIX CRITICAL: Moved 'from src.main import app' INSIDE fixture
 
 Integration tests for authentication routes
-
-Changes in v5:
-- Fixed cleanup: existing["_key"] Ã¢â€ â€™ existing["id"]
-- Final cleanup of remaining _key references
-
-Changes in v4:
-- Fixed test_get_me_success and test_complete_auth_flow: /api/users/me -> /api/auth/me
-- Endpoint is on auth router (/api/auth), not users router
-
-Changes in v3:
-- Already using hash_password() dynamically in fixture (no changes needed)
-
-Changes in v2:
-- Fixed test_register_duplicate_email to expect 409 instead of 400
-- Fixed test_get_me_success and test_complete_auth_flow to use UserService(db=db)
-
-Changes in v1:
-- FIX CRITIQUE: Toutes les assertions utilisent response.json()["data"] correctement
-- Ajout test /api/auth/me (get_me_success)
-- Ajout tests change_password
 """
 
 import pytest
+import hashlib
 from fastapi.testclient import TestClient
 
-from src.main import app
+
+def compute_password_hash(password: str) -> str:
+    """Compute SHA256 hash of password (simulates frontend behavior)"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# Pre-computed SHA256 hashes for test passwords
+ROOT_PASS_HASH = compute_password_hash("RootPass123")
+TEST_PASS_HASH = compute_password_hash("StrongPass123")
+NEW_PASS_HASH = compute_password_hash("NewPass456")
+OLD_PASS_HASH = compute_password_hash("OldPass123")
+CORRECT_PASS_HASH = compute_password_hash("CorrectPass123")
+WRONG_PASS_HASH = compute_password_hash("WrongPass456")
+ANOTHER_PASS_HASH = compute_password_hash("AnotherPass456")
+ANY_PASS_HASH = compute_password_hash("AnyPass123")
 
 
 @pytest.fixture
 def client(arango_container_function):
     """Test client with database and root user"""
+    # CRITICAL: Import app INSIDE fixture, after container is ready
+    from src.main import app
     from src.core.security import hash_password
     from datetime import datetime
     
@@ -54,10 +50,11 @@ def client(arango_container_function):
         db.create_collection("users")
     
     # Create root user for tests
+    # Store bcrypt(SHA256(password)) in DB
     root_user = {
         "name": "Root User",
         "email": "root@test.com",
-        "password_hash": hash_password("RootPass123"),
+        "password_hash": hash_password(ROOT_PASS_HASH),
         "role": "root",
         "status": "active",
         "createdAt": datetime.utcnow(),
@@ -84,7 +81,7 @@ class TestAuthRoutesIntegration:
         response = client.post("/api/auth/register", json={
             "name": "Test User",
             "email": "test@example.com",
-            "password": "StrongPass123"
+            "password_hash": TEST_PASS_HASH
         })
         
         assert response.status_code == 201
@@ -107,25 +104,26 @@ class TestAuthRoutesIntegration:
         client.post("/api/auth/register", json={
             "name": "User 1",
             "email": "duplicate@example.com",
-            "password": "StrongPass123"
+            "password_hash": TEST_PASS_HASH
         })
         
         # Try to register with same email
         response = client.post("/api/auth/register", json={
             "name": "User 2",
             "email": "duplicate@example.com",
-            "password": "AnotherPass456"
+            "password_hash": ANOTHER_PASS_HASH
         })
         
         assert response.status_code == 409
         assert "already registered" in response.json()["detail"].lower()
     
     def test_register_weak_password(self, client):
-        """Test registration with weak password"""
+        """Test registration with weak password hash (invalid length)"""
+        # SHA256 must be exactly 64 chars - this is too short
         response = client.post("/api/auth/register", json={
             "name": "Test User",
             "email": "test@example.com",
-            "password": "weak"
+            "password_hash": "tooshort"
         })
         
         assert response.status_code == 422
@@ -135,7 +133,7 @@ class TestAuthRoutesIntegration:
         response = client.post("/api/auth/register", json={
             "name": "Test User",
             "email": "not-an-email",
-            "password": "StrongPass123"
+            "password_hash": TEST_PASS_HASH
         })
         
         assert response.status_code == 422
@@ -143,16 +141,17 @@ class TestAuthRoutesIntegration:
     def test_login_success(self, client):
         """Test successful login"""
         # Register user first
+        login_pass_hash = compute_password_hash("LoginPass123")
         client.post("/api/auth/register", json={
             "name": "Login Test",
             "email": "login@example.com",
-            "password": "StrongPass123"
+            "password_hash": login_pass_hash
         })
         
-        # Login
+        # Login with same hash
         response = client.post("/api/auth/login", json={
             "email": "login@example.com",
-            "password": "StrongPass123"
+            "password_hash": login_pass_hash
         })
         
         assert response.status_code == 200
@@ -170,13 +169,13 @@ class TestAuthRoutesIntegration:
         client.post("/api/auth/register", json={
             "name": "Test User",
             "email": "test@example.com",
-            "password": "CorrectPass123"
+            "password_hash": CORRECT_PASS_HASH
         })
         
-        # Try login with wrong password
+        # Try login with wrong password hash
         response = client.post("/api/auth/login", json={
             "email": "test@example.com",
-            "password": "WrongPass456"
+            "password_hash": WRONG_PASS_HASH
         })
         
         assert response.status_code == 401
@@ -186,7 +185,7 @@ class TestAuthRoutesIntegration:
         """Test login with non-existent email"""
         response = client.post("/api/auth/login", json={
             "email": "nonexistent@example.com",
-            "password": "AnyPass123"
+            "password_hash": ANY_PASS_HASH
         })
         
         assert response.status_code == 401
@@ -195,15 +194,16 @@ class TestAuthRoutesIntegration:
     def test_get_me_success(self, client):
         """Test get current user profile"""
         # Register and login
+        me_pass_hash = compute_password_hash("MePass123")
         client.post("/api/auth/register", json={
             "name": "Me Test",
             "email": "me@example.com",
-            "password": "StrongPass123"
+            "password_hash": me_pass_hash
         })
         
         login_response = client.post("/api/auth/login", json={
             "email": "me@example.com",
-            "password": "StrongPass123"
+            "password_hash": me_pass_hash
         })
         
         # Extract token correctly
@@ -222,15 +222,16 @@ class TestAuthRoutesIntegration:
     def test_logout(self, client):
         """Test logout endpoint"""
         # Register and login
+        logout_pass_hash = compute_password_hash("LogoutPass123")
         client.post("/api/auth/register", json={
             "name": "Logout Test",
             "email": "logout@example.com",
-            "password": "StrongPass123"
+            "password_hash": logout_pass_hash
         })
         
         login_response = client.post("/api/auth/login", json={
             "email": "logout@example.com",
-            "password": "StrongPass123"
+            "password_hash": logout_pass_hash
         })
         
         # Extract token correctly
@@ -250,12 +251,12 @@ class TestAuthRoutesIntegration:
         client.post("/api/auth/register", json={
             "name": "Password Test",
             "email": "password@example.com",
-            "password": "OldPass123"
+            "password_hash": OLD_PASS_HASH
         })
         
         login_response = client.post("/api/auth/login", json={
             "email": "password@example.com",
-            "password": "OldPass123"
+            "password_hash": OLD_PASS_HASH
         })
         
         token = login_response.json()["token"]
@@ -275,7 +276,7 @@ class TestAuthRoutesIntegration:
         # Login with new password should work
         new_login = client.post("/api/auth/login", json={
             "email": "password@example.com",
-            "password": "NewPass456"
+            "password_hash": NEW_PASS_HASH
         })
         assert new_login.status_code == 200
     
@@ -285,12 +286,12 @@ class TestAuthRoutesIntegration:
         client.post("/api/auth/register", json={
             "name": "Password Test",
             "email": "password2@example.com",
-            "password": "CorrectPass123"
+            "password_hash": CORRECT_PASS_HASH
         })
         
         login_response = client.post("/api/auth/login", json={
             "email": "password2@example.com",
-            "password": "CorrectPass123"
+            "password_hash": CORRECT_PASS_HASH
         })
         
         token = login_response.json()["token"]
@@ -325,18 +326,20 @@ class TestAuthFlow:
     
     def test_complete_auth_flow(self, client):
         """Test register -> login -> authenticated request -> logout"""
+        flow_pass_hash = compute_password_hash("FlowPass123")
+        
         # 1. Register
         register_response = client.post("/api/auth/register", json={
             "name": "Flow Test",
             "email": "flow@example.com",
-            "password": "StrongPass123"
+            "password_hash": flow_pass_hash
         })
         assert register_response.status_code == 201
         
         # 2. Login
         login_response = client.post("/api/auth/login", json={
             "email": "flow@example.com",
-            "password": "StrongPass123"
+            "password_hash": flow_pass_hash
         })
         assert login_response.status_code == 200
         token = login_response.json()["token"]

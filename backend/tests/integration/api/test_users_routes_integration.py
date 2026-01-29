@@ -1,55 +1,42 @@
 """
 Path: backend/tests/integration/api/test_users_routes_integration.py
-Version: 6.0
+Version: 8.0
 
-Changes in v6:
-- Updated response format to match frontend spec
-- POST/GET/PUT /api/users now return {"user": {...}} instead of {"data": {...}}
-- GET /api/users returns {"users": [...]} instead of {"data": [...]}
-- DELETE still returns {"success": true, "message": "..."}
+Changes in v8.0:
+- FIX CRITICAL: Use password_hash (SHA256) instead of password for all login calls
+- LoginRequest requires password_hash (64 hex chars), not password
+- Added compute_password_hash() helper function
+- All client.post("/api/auth/login") now use password_hash
 
-Changes in v5:
-- Fixed 9 remaining _key references Ã¢â€ â€™ id (lines 234, 261, 286, 311, 337, 363, 391, 415, 442)
-- All user/manager/root_user accesses now use ['id']
-
-Changes in v4:
-- Fixed cleanup: existing_root["_key"] Ã¢â€ â€™ existing_root["id"]
-- Matches adapter behavior (returns 'id')
-
-Changes in v3:
-- Already using hash_password() dynamically in fixtures
+Changes in v7.0:
+- FIX CRITICAL: Moved 'from src.main import app' INSIDE fixture
 
 Integration tests for user management routes
-
-Changes in v3:
-- Removed pre-calculated bcrypt hash constant
-- All helpers now generate hash dynamically using hash_password()
-- Import hash_password from src.core.security
-
-Changes in v2:
-- Fixed test_create_user_as_root: removed duplicate create_root_user call
-- Fixed test_delete_user_as_root: removed duplicate create_root_user call
-- Fixed all forbidden tests: use response.json()["detail"] for error responses instead of ["data"]
-- Tests expecting 403/401 now correctly access error detail, not data
-
-Changes in v1:
-- Added created_at/updated_at to all create_*_user helpers
-- Import datetime
-- FIX CRITIQUE: All response.json() accesses use ["data"]
-- Systematic verification of "data" presence
 """
 
 import pytest
+import hashlib
 from datetime import datetime
 from fastapi.testclient import TestClient
 
-from src.main import app
 from src.core.security import hash_password
+
+
+def compute_password_hash(password: str) -> str:
+    """Compute SHA256 hash of password (simulates frontend behavior)"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# Pre-computed SHA256 hash for test password
+ROOT_PASS_HASH = compute_password_hash("RootPass123")
 
 
 @pytest.fixture
 def client(arango_container_function):
     """Test client with database and root user"""
+    # CRITICAL: Import app INSIDE fixture, after container is ready
+    from src.main import app
+    
     db = arango_container_function
     
     if not db.collection_exists("users"):
@@ -71,7 +58,7 @@ def create_root_user(db):
     return db.create("users", {
         "name": "Root User",
         "email": "root@example.com",
-        "password_hash": hash_password("RootPass123"),
+        "password_hash": hash_password(ROOT_PASS_HASH),
         "role": "root",
         "status": "active",
         "createdAt": datetime.utcnow(),
@@ -84,7 +71,7 @@ def create_manager_user(db):
     return db.create("users", {
         "name": "Manager User",
         "email": "manager@example.com",
-        "password_hash": hash_password("RootPass123"),
+        "password_hash": hash_password(ROOT_PASS_HASH),
         "role": "manager",
         "status": "active",
         "createdAt": datetime.utcnow(),
@@ -97,12 +84,35 @@ def create_regular_user(db):
     return db.create("users", {
         "name": "Regular User",
         "email": "user@example.com",
-        "password_hash": hash_password("RootPass123"),
+        "password_hash": hash_password(ROOT_PASS_HASH),
         "role": "user",
         "status": "active",
         "createdAt": datetime.utcnow(),
         "updatedAt": None
     })
+
+
+def login_as_root(client):
+    """Helper to login as root and get token"""
+    response = client.post("/api/auth/login", json={
+        "email": "root@example.com",
+        "password_hash": ROOT_PASS_HASH
+    })
+    assert response.status_code == 200, f"Login failed: {response.text}"
+    return response.json()["token"]
+
+
+def login_as_user(client, email, password_hash=None):
+    """Helper to login as any user and get token"""
+    if password_hash is None:
+        password_hash = ROOT_PASS_HASH
+    
+    response = client.post("/api/auth/login", json={
+        "email": email,
+        "password_hash": password_hash
+    })
+    assert response.status_code == 200, f"Login failed: {response.text}"
+    return response.json()["token"]
 
 
 @pytest.mark.integration
@@ -111,16 +121,7 @@ class TestUsersRoutesIntegration:
     
     def test_create_user_as_root(self, client, arango_container_function):
         """Test root can create users"""
-        # Root user already created by fixture - no need to create again
-        
-        # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Create new user
         response = client.post(
@@ -149,13 +150,7 @@ class TestUsersRoutesIntegration:
         create_manager_user(db)
         
         # Login as manager
-        login_response = client.post("/api/auth/login", json={
-            "email": "manager@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_user(client, "manager@example.com")
         
         # Try to create user
         response = client.post(
@@ -169,7 +164,6 @@ class TestUsersRoutesIntegration:
         )
         
         assert response.status_code == 403
-        # Error responses have "detail", not "user"
         assert "permission" in response.json()["detail"].lower()
     
     def test_create_user_as_user_forbidden(self, client, arango_container_function):
@@ -178,13 +172,7 @@ class TestUsersRoutesIntegration:
         create_regular_user(db)
         
         # Login as user
-        login_response = client.post("/api/auth/login", json={
-            "email": "user@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_user(client, "user@example.com")
         
         # Try to create user
         response = client.post(
@@ -198,21 +186,11 @@ class TestUsersRoutesIntegration:
         )
         
         assert response.status_code == 403
-        # Error responses have "detail", not "user"
         assert "permission" in response.json()["detail"].lower()
     
     def test_list_users_as_root(self, client, arango_container_function):
         """Test root can list all users"""
-        db = arango_container_function
-        
-        # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # List users
         response = client.get(
@@ -235,13 +213,7 @@ class TestUsersRoutesIntegration:
         user = create_regular_user(db)
         
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Get user by ID
         response = client.get(
@@ -263,13 +235,7 @@ class TestUsersRoutesIntegration:
         user = create_regular_user(db)
         
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Update user
         response = client.put(
@@ -294,13 +260,7 @@ class TestUsersRoutesIntegration:
         user = create_regular_user(db)
         
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Delete user
         response = client.delete(
@@ -325,13 +285,7 @@ class TestUsersRoutesIntegration:
         user = create_regular_user(db)
         
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Delete user
         response = client.delete(
@@ -346,13 +300,7 @@ class TestUsersRoutesIntegration:
         db = arango_container_function
         
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Get root user
         root_user = db.find_one("users", {"email": "root@example.com"})
@@ -364,7 +312,6 @@ class TestUsersRoutesIntegration:
         )
         
         assert response.status_code == 403
-        # Error responses have "detail", not "user"
         assert "cannot delete yourself" in response.json()["detail"].lower()
 
 
@@ -378,13 +325,7 @@ class TestUserPermissions:
         create_regular_user(db)
         
         # Login as user
-        login_response = client.post("/api/auth/login", json={
-            "email": "user@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_user(client, "user@example.com")
         
         # Try to list users (manager+ only)
         response = client.get(
@@ -393,7 +334,6 @@ class TestUserPermissions:
         )
         
         assert response.status_code == 403
-        # Error responses have "detail", not "user"
         assert "permission" in response.json()["detail"].lower()
     
     def test_manager_cannot_access_root_endpoints(self, client, arango_container_function):
@@ -402,13 +342,7 @@ class TestUserPermissions:
         create_manager_user(db)
         
         # Login as manager
-        login_response = client.post("/api/auth/login", json={
-            "email": "manager@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_user(client, "manager@example.com")
         
         # Try to create user (root only)
         response = client.post(
@@ -424,7 +358,6 @@ class TestUserPermissions:
         )
         
         assert response.status_code == 403
-        # Error responses have "detail", not "user"
         assert "permission" in response.json()["detail"].lower()
 
 
@@ -438,13 +371,7 @@ class TestUserStatusToggle:
         user = create_regular_user(db)
         
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Disable user
         response = client.put(
@@ -471,13 +398,7 @@ class TestUserStatusToggle:
     def test_toggle_self_status_forbidden(self, client, arango_container_function):
         """Test cannot disable own account"""
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Get root user
         db = arango_container_function
@@ -500,7 +421,7 @@ class TestUserStatusToggle:
         user2 = db.create("users", {
             "name": "User Two",
             "email": "user2@example.com",
-            "password_hash": hash_password("RootPass123"),
+            "password_hash": hash_password(ROOT_PASS_HASH),
             "role": "user",
             "status": "active",
             "createdAt": datetime.utcnow(),
@@ -508,13 +429,7 @@ class TestUserStatusToggle:
         })
         
         # Login as user1
-        login_response = client.post("/api/auth/login", json={
-            "email": "user@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_user(client, "user@example.com")
         
         # Try to disable user2
         response = client.put(
@@ -537,13 +452,7 @@ class TestUserRoleAssignment:
         user = create_regular_user(db)
         
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Promote to manager
         response = client.put(
@@ -574,13 +483,7 @@ class TestUserRoleAssignment:
         user = create_regular_user(db)
         
         # Login as manager
-        login_response = client.post("/api/auth/login", json={
-            "email": "manager@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_user(client, "manager@example.com")
         
         # Try to promote user
         response = client.put(
@@ -595,13 +498,7 @@ class TestUserRoleAssignment:
     def test_demote_self_from_root_forbidden(self, client, arango_container_function):
         """Test cannot demote yourself from root"""
         # Login as root
-        login_response = client.post("/api/auth/login", json={
-            "email": "root@example.com",
-            "password": "RootPass123"
-        })
-        
-        assert login_response.status_code == 200
-        token = login_response.json()["token"]
+        token = login_as_root(client)
         
         # Get root user
         db = arango_container_function

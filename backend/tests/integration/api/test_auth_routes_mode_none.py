@@ -1,6 +1,11 @@
 """
 Path: backend/tests/integration/api/test_auth_routes_mode_none.py
-Version: 2.0.3
+Version: 3.0
+
+Changes in v3.0:
+- FIX: Use password_hash instead of password for login/register tests
+- LoginRequest and RegisterRequest models expect password_hash (SHA256, 64 chars)
+- Pydantic validation was failing (422) before mode check could return 403
 
 Changes in v1.3:
 - FIX: test_change_password_forbidden uses valid passwords for Pydantic validation
@@ -21,6 +26,11 @@ Integration tests for auth endpoints in "none" mode
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
+
+
+# Valid SHA256 hash (64 hex characters) for tests
+# This is SHA256("Password123") - actual value doesn't matter for mode check tests
+VALID_SHA256_HASH = "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
 
 
 @pytest.fixture
@@ -62,29 +72,32 @@ class TestAuthModeNone:
     
     def test_login_endpoint_forbidden(self, client_none_mode):
         """Test /auth/login returns 403 in 'none' mode"""
+        # Must use password_hash (SHA256, 64 chars) - LoginRequest model requirement
         response = client_none_mode.post("/api/auth/login", json={
             "email": "test@example.com",
-            "password": "password"
+            "password_hash": VALID_SHA256_HASH
         })
         
-        # Should be forbidden
+        # Should be forbidden (mode check happens after validation)
         assert response.status_code == 403
         assert "none" in response.json()["detail"].lower()
     
     def test_register_endpoint_forbidden(self, client_none_mode):
         """Test /auth/register returns 403 in 'none' mode"""
+        # Must use password_hash (SHA256, 64 chars) - RegisterRequest model requirement
         response = client_none_mode.post("/api/auth/register", json={
             "name": "Test User",
             "email": "test@example.com",
-            "password": "Password123"
+            "password_hash": VALID_SHA256_HASH
         })
         
-        # Should be forbidden
+        # Should be forbidden (mode check happens after validation)
         assert response.status_code == 403
         assert "none" in response.json()["detail"].lower()
     
     def test_change_password_forbidden(self, client_none_mode):
         """Test /auth/change-password returns 403 in 'none' mode"""
+        # PasswordChange model uses current_password/new_password (not hashes)
         response = client_none_mode.post("/api/auth/change-password", json={
             "current_password": "OldPass123",
             "new_password": "NewPass456"

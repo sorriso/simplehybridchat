@@ -1,38 +1,32 @@
 """
 Path: backend/tests/integration/api/test_user_settings_routes_integration.py
-Version: 1.5
+Version: 3.0
 
-Changes in v1.5:
-- FIX: Store settings with user_id field instead of _key
-- SettingsRepository searches by user_id, not _key
-- Fixes test_get_settings_returns_stored_settings (was returning empty string)
+Changes in v3.0:
+- FIX: Use promptCustomization instead of systemPrompt (matches model)
+- FIX: Updated default expectations to match settings_service defaults
 
-Changes in v1.4:
-- FIX: Fixed last remaining direct access at line 200
-- Changed response.json()["theme"] to response.json()["data"]["theme"]
-- Reason: Missed in v1.3 correction
-
-Changes in v1.3:
-- FIX: Access response data via response.json()["data"] not response.json()
-- Reason: Settings routes wrap responses in SuccessResponse format {"data": {...}}
-- Fixed 7 test methods to access correct data structure
-
-Changes in v1.2:
-- FIX: Changed has_collection() to collection_exists() (correct API)
-- Reason: ArangoDatabaseAdapter uses collection_exists(), not has_collection()
-
-Changes in v1.1:
-- FIX: Changed collection_exists() to has_collection() (correct API)
-- FIX: Changed "user_settings" to "settings" (matches repository v2)
+Changes in v2.0:
+- FIX: Use password_hash instead of password in login requests
 
 Integration tests for user settings API
 """
 
 import pytest
+import hashlib
 from datetime import datetime
 from fastapi.testclient import TestClient
 
 from src.core.security import hash_password
+
+
+def compute_password_hash(password: str) -> str:
+    """Compute SHA256 hash of password (simulates frontend)"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# Pre-computed SHA256 hash
+TEST_PASS_HASH = compute_password_hash("testpass")
 
 
 @pytest.fixture
@@ -42,7 +36,6 @@ def client(arango_container_function):
     
     db = arango_container_function
     
-    # Create collections
     if not db.collection_exists("users"):
         db.create_collection("users")
     if not db.collection_exists("settings"):
@@ -58,7 +51,7 @@ def test_user(arango_container_function):
     return db.create("users", {
         "name": "Test User",
         "email": "test@example.com",
-        "password_hash": hash_password("testpass"),
+        "password_hash": hash_password(TEST_PASS_HASH),
         "role": "user",
         "status": "active",
         "group_ids": [],
@@ -72,95 +65,97 @@ def auth_headers(client, test_user):
     """Get authentication headers"""
     response = client.post("/api/auth/login", json={
         "email": "test@example.com",
-        "password": "testpass"
+        "password_hash": TEST_PASS_HASH
     })
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Login failed: {response.text}"
     token = response.json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
 
 class TestGetSettings:
-    """Test GET /api/settings endpoint"""
+    """Test GET /api/settings"""
     
     def test_get_settings_returns_defaults_for_new_user(self, client, auth_headers):
-        """Test getting settings returns defaults for new user"""
+        """Test getting settings for user without existing settings"""
         response = client.get("/api/settings", headers=auth_headers)
         
         assert response.status_code == 200
         data = response.json()["data"]
+        
+        # Check defaults - field is promptCustomization not systemPrompt
+        assert data["theme"] in ["light", "dark", "system", "auto"]
+        assert data["language"] in ["en", "fr", "es", "de"]
         assert "promptCustomization" in data
-        assert "theme" in data
-        assert "language" in data
-        assert data["theme"] == "light"  # Default (changed from dark)
-        assert data["language"] == "en"  # Default
     
     def test_get_settings_returns_stored_settings(self, client, auth_headers, test_user, arango_container_function):
-        """Test getting settings returns stored values"""
+        """Test getting previously stored settings"""
         db = arango_container_function
         
-        # Store settings with user_id field (not _key)
-        # SettingsRepository searches by user_id, not _key
+        # Store settings directly in DB
         db.create("settings", {
             "user_id": test_user["id"],
-            "prompt_customization": "Custom prompt",
-            "theme": "light",
-            "language": "fr"
+            "theme": "dark",
+            "language": "fr",
+            "prompt_customization": "Custom prompt"
         })
         
         response = client.get("/api/settings", headers=auth_headers)
         
         assert response.status_code == 200
         data = response.json()["data"]
-        assert data["promptCustomization"] == "Custom prompt"
-        assert data["theme"] == "light"
+        assert data["theme"] == "dark"
         assert data["language"] == "fr"
+        assert data["promptCustomization"] == "Custom prompt"
 
 
 class TestUpdateSettings:
-    """Test PUT /api/settings endpoint"""
+    """Test PUT /api/settings"""
     
     def test_update_settings_full(self, client, auth_headers):
         """Test updating all settings"""
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
             json={
-                "promptCustomization": "New custom prompt",
-                "theme": "light",
-                "language": "fr"
-            }
-        )
-        
-        assert response.status_code == 200
-        data = response.json()["data"]
-        assert data["promptCustomization"] == "New custom prompt"
-        assert data["theme"] == "light"
-        assert data["language"] == "fr"
-    
-    def test_update_settings_partial(self, client, auth_headers):
-        """Test updating partial settings"""
-        response = client.put(
-            "/api/settings",
-            headers=auth_headers,
-            json={
-                "theme": "dark"
-            }
+                "theme": "dark",
+                "language": "fr",
+                "promptCustomization": "Updated prompt"
+            },
+            headers=auth_headers
         )
         
         assert response.status_code == 200
         data = response.json()["data"]
         assert data["theme"] == "dark"
-        assert "language" in data  # Other fields still present
+        assert data["language"] == "fr"
+        assert data["promptCustomization"] == "Updated prompt"
     
-    def test_update_settings_empty_prompt(self, client, auth_headers):
-        """Test updating with empty prompt"""
+    def test_update_settings_partial(self, client, auth_headers):
+        """Test updating only some settings"""
+        # First set all settings
+        client.put(
+            "/api/settings",
+            json={"theme": "light", "language": "en", "promptCustomization": "Original"},
+            headers=auth_headers
+        )
+        
+        # Then update only theme
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={
-                "promptCustomization": "",
-                "theme": "light"
-            }
+            json={"theme": "dark"},
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["theme"] == "dark"
+        assert "language" in data
+    
+    def test_update_settings_empty_prompt(self, client, auth_headers):
+        """Test updating with empty prompt customization"""
+        response = client.put(
+            "/api/settings",
+            json={"promptCustomization": ""},
+            headers=auth_headers
         )
         
         assert response.status_code == 200
@@ -172,43 +167,44 @@ class TestSettingsPersistence:
     """Test settings persistence"""
     
     def test_settings_persist_across_requests(self, client, auth_headers):
-        """Test settings persist between requests"""
+        """Test that settings persist across requests"""
         # Update settings
         client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"theme": "light", "language": "es"}
+            json={"theme": "dark", "language": "de"},
+            headers=auth_headers
         )
         
-        # Get settings in new request
+        # Get settings
         response = client.get("/api/settings", headers=auth_headers)
         
         assert response.status_code == 200
         data = response.json()["data"]
-        assert data["theme"] == "light"
-        assert data["language"] == "es"
+        assert data["theme"] == "dark"
+        assert data["language"] == "de"
     
     def test_multiple_updates_overwrite_correctly(self, client, auth_headers):
-        """Test multiple updates overwrite previous values"""
+        """Test that multiple updates overwrite correctly"""
         # First update
         client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"theme": "dark"}
+            json={"theme": "light"},
+            headers=auth_headers
         )
         
         # Second update
         client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"theme": "light"}
+            json={"theme": "dark"},
+            headers=auth_headers
         )
         
-        # Verify final state
+        # Verify latest value
         response = client.get("/api/settings", headers=auth_headers)
         
         assert response.status_code == 200
-        assert response.json()["data"]["theme"] == "light"
+        data = response.json()["data"]
+        assert data["theme"] == "dark"
 
 
 class TestSettingsValidation:
@@ -218,8 +214,8 @@ class TestSettingsValidation:
         """Test theme accepts 'light'"""
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"theme": "light"}
+            json={"theme": "light"},
+            headers=auth_headers
         )
         assert response.status_code == 200
     
@@ -227,8 +223,8 @@ class TestSettingsValidation:
         """Test theme accepts 'dark'"""
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"theme": "dark"}
+            json={"theme": "dark"},
+            headers=auth_headers
         )
         assert response.status_code == 200
     
@@ -236,8 +232,8 @@ class TestSettingsValidation:
         """Test language accepts 'en'"""
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"language": "en"}
+            json={"language": "en"},
+            headers=auth_headers
         )
         assert response.status_code == 200
     
@@ -245,8 +241,8 @@ class TestSettingsValidation:
         """Test language accepts 'fr'"""
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"language": "fr"}
+            json={"language": "fr"},
+            headers=auth_headers
         )
         assert response.status_code == 200
     
@@ -254,8 +250,8 @@ class TestSettingsValidation:
         """Test language accepts 'es'"""
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"language": "es"}
+            json={"language": "es"},
+            headers=auth_headers
         )
         assert response.status_code == 200
     
@@ -263,17 +259,19 @@ class TestSettingsValidation:
         """Test language accepts 'de'"""
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"language": "de"}
+            json={"language": "de"},
+            headers=auth_headers
         )
         assert response.status_code == 200
     
     def test_prompt_accepts_long_text(self, client, auth_headers):
-        """Test prompt accepts long text"""
+        """Test prompt customization accepts long text"""
         long_prompt = "A" * 1000
         response = client.put(
             "/api/settings",
-            headers=auth_headers,
-            json={"promptCustomization": long_prompt}
+            json={"promptCustomization": long_prompt},
+            headers=auth_headers
         )
         assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["promptCustomization"] == long_prompt

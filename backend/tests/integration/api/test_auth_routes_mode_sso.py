@@ -1,6 +1,11 @@
 """
 Path: backend/tests/integration/api/test_auth_routes_mode_sso.py
-Version: 2.0.1
+Version: 3.0
+
+Changes in v3.0:
+- FIX: Use password_hash instead of password for login/register tests
+- LoginRequest and RegisterRequest models expect password_hash (SHA256, 64 chars)
+- Pydantic validation was failing (422) before mode check could return 403
 
 Changes in v1.1:
 - FIX: Corrected fixture to patch AUTH_MODE and SSO headers at attribute level
@@ -16,6 +21,11 @@ from fastapi.testclient import TestClient
 from datetime import datetime
 
 from src.core.security import hash_password
+
+
+# Valid SHA256 hash (64 hex characters) for tests
+# This is SHA256("Password123") - actual value doesn't matter for mode check tests
+VALID_SHA256_HASH = "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
 
 
 @pytest.fixture
@@ -143,12 +153,13 @@ class TestAuthModeSSO:
         """Test /auth/login returns 403 in 'sso' mode"""
         client, _ = client_sso_mode
         
+        # Must use password_hash (SHA256, 64 chars) - LoginRequest model requirement
         response = client.post("/api/auth/login", json={
             "email": "test@example.com",
-            "password": "password"
+            "password_hash": VALID_SHA256_HASH
         })
         
-        # Should be forbidden
+        # Should be forbidden (mode check happens after validation)
         assert response.status_code == 403
         assert "sso" in response.json()["detail"].lower()
     
@@ -156,13 +167,14 @@ class TestAuthModeSSO:
         """Test /auth/register returns 403 in 'sso' mode"""
         client, _ = client_sso_mode
         
+        # Must use password_hash (SHA256, 64 chars) - RegisterRequest model requirement
         response = client.post("/api/auth/register", json={
             "name": "Test User",
             "email": "test@example.com",
-            "password": "Password123"
+            "password_hash": VALID_SHA256_HASH
         })
         
-        # Should be forbidden
+        # Should be forbidden (mode check happens after validation)
         assert response.status_code == 403
         assert "sso" in response.json()["detail"].lower()
     

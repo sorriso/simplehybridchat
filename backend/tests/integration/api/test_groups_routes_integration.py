@@ -1,15 +1,31 @@
 """
 Path: backend/tests/integration/api/test_groups_routes_integration.py
-Version: 1.0
+Version: 2.0
+
+Changes in v2.0:
+- FIX: Use password_hash instead of password in login requests
+- Added compute_password_hash() helper for SHA256 hashing
+- Store bcrypt(SHA256) in DB, send SHA256 to login API
 
 Integration tests for conversation groups API endpoints
 """
 
 import pytest
+import hashlib
 from datetime import datetime
 from fastapi.testclient import TestClient
 
 from src.core.security import hash_password
+
+
+def compute_password_hash(password: str) -> str:
+    """Compute SHA256 hash of password (simulates frontend)"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# Pre-computed SHA256 hashes
+TEST_PASS_HASH = compute_password_hash("password123")
+OTHER_PASS_HASH = compute_password_hash("password123")
 
 
 @pytest.fixture
@@ -19,7 +35,6 @@ def client(arango_container_function):
     
     db = arango_container_function
     
-    # Create collections
     for collection in ["users", "conversations", "conversation_groups"]:
         if not db.collection_exists(collection):
             db.create_collection(collection)
@@ -34,7 +49,7 @@ def test_user(arango_container_function):
     return db.create("users", {
         "name": "Test User",
         "email": "test@example.com",
-        "password_hash": hash_password("password123"),
+        "password_hash": hash_password(TEST_PASS_HASH),
         "role": "user",
         "status": "active",
         "group_ids": [],
@@ -50,7 +65,7 @@ def other_user(arango_container_function):
     return db.create("users", {
         "name": "Other User",
         "email": "other@example.com",
-        "password_hash": hash_password("password123"),
+        "password_hash": hash_password(OTHER_PASS_HASH),
         "role": "user",
         "status": "active",
         "group_ids": [],
@@ -64,9 +79,9 @@ def auth_headers(client, test_user):
     """Get authentication headers"""
     response = client.post("/api/auth/login", json={
         "email": "test@example.com",
-        "password": "password123"
+        "password_hash": TEST_PASS_HASH
     })
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Login failed: {response.text}"
     token = response.json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -76,9 +91,9 @@ def other_auth_headers(client, other_user):
     """Get authentication headers for other user"""
     response = client.post("/api/auth/login", json={
         "email": "other@example.com",
-        "password": "password123"
+        "password_hash": OTHER_PASS_HASH
     })
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Login failed: {response.text}"
     token = response.json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -149,14 +164,13 @@ class TestGroupsAPI:
         """Test GET /api/groups - List user's groups"""
         db = arango_container_function
         
-        # Create groups
-        group1 = db.create("conversation_groups", {
+        db.create("conversation_groups", {
             "name": "Work",
             "owner_id": test_user["id"],
             "conversation_ids": [],
             "created_at": datetime.utcnow()
         })
-        group2 = db.create("conversation_groups", {
+        db.create("conversation_groups", {
             "name": "Personal",
             "owner_id": test_user["id"],
             "conversation_ids": [],
@@ -176,7 +190,6 @@ class TestGroupsAPI:
         """Test list groups returns only user's own groups"""
         db = arango_container_function
         
-        # Create group for test_user
         db.create("conversation_groups", {
             "name": "My Group",
             "owner_id": test_user["id"],
@@ -184,7 +197,6 @@ class TestGroupsAPI:
             "created_at": datetime.utcnow()
         })
         
-        # Create group for other_user
         db.create("conversation_groups", {
             "name": "Other Group",
             "owner_id": other_user["id"],
@@ -228,7 +240,6 @@ class TestGroupsAPI:
         """Test get group belonging to another user"""
         db = arango_container_function
         
-        # Create group for other_user
         group = db.create("conversation_groups", {
             "name": "Other's Group",
             "owner_id": other_user["id"],
@@ -236,7 +247,6 @@ class TestGroupsAPI:
             "created_at": datetime.utcnow()
         })
         
-        # Try to access with test_user credentials
         response = client.get(f"/api/groups/{group['id']}", headers=auth_headers)
         
         assert response.status_code == 403
@@ -296,7 +306,6 @@ class TestGroupsAPI:
         
         assert response.status_code == 204
         
-        # Verify group is deleted
         deleted = db.get_by_id("conversation_groups", group["id"])
         assert deleted is None
     
@@ -304,7 +313,6 @@ class TestGroupsAPI:
         """Test delete group sets conversation.group_id to null"""
         db = arango_container_function
         
-        # Create conversation
         conv = db.create("conversations", {
             "title": "Test",
             "owner_id": test_user["id"],
@@ -316,7 +324,6 @@ class TestGroupsAPI:
             "updated_at": datetime.utcnow()
         })
         
-        # Create group with conversation
         group = db.create("conversation_groups", {
             "name": "Work",
             "owner_id": test_user["id"],
@@ -324,14 +331,11 @@ class TestGroupsAPI:
             "created_at": datetime.utcnow()
         })
         
-        # Set conversation.group_id
         db.update("conversations", conv["id"], {"group_id": group["id"]})
         
-        # Delete group
         response = client.delete(f"/api/groups/{group['id']}", headers=auth_headers)
         assert response.status_code == 204
         
-        # Verify conversation.group_id is null
         updated_conv = db.get_by_id("conversations", conv["id"])
         assert updated_conv["group_id"] is None
     
@@ -354,7 +358,6 @@ class TestGroupsAPI:
         """Test POST /api/groups/{id}/conversations - Add conversation"""
         db = arango_container_function
         
-        # Create group and conversation
         group = db.create("conversation_groups", {
             "name": "Work",
             "owner_id": test_user["id"],
@@ -383,7 +386,6 @@ class TestGroupsAPI:
         data = response.json()["data"]
         assert conv["id"] in data["conversationIds"]
         
-        # Verify conversation.group_id was set
         updated_conv = db.get_by_id("conversations", conv["id"])
         assert updated_conv["group_id"] == group["id"]
     
@@ -391,7 +393,6 @@ class TestGroupsAPI:
         """Test add conversation user doesn't own"""
         db = arango_container_function
         
-        # Create group for test_user
         group = db.create("conversation_groups", {
             "name": "Work",
             "owner_id": test_user["id"],
@@ -399,7 +400,6 @@ class TestGroupsAPI:
             "created_at": datetime.utcnow()
         })
         
-        # Create conversation for other_user
         conv = db.create("conversations", {
             "title": "Test",
             "owner_id": other_user["id"],
@@ -423,7 +423,6 @@ class TestGroupsAPI:
         """Test DELETE /api/groups/{id}/conversations/{convId} - Remove conversation"""
         db = arango_container_function
         
-        # Create conversation
         conv = db.create("conversations", {
             "title": "Test",
             "owner_id": test_user["id"],
@@ -435,7 +434,6 @@ class TestGroupsAPI:
             "updated_at": datetime.utcnow()
         })
         
-        # Create group with conversation
         group = db.create("conversation_groups", {
             "name": "Work",
             "owner_id": test_user["id"],
@@ -443,10 +441,8 @@ class TestGroupsAPI:
             "created_at": datetime.utcnow()
         })
         
-        # Set conversation.group_id
         db.update("conversations", conv["id"], {"group_id": group["id"]})
         
-        # Remove conversation from group
         response = client.delete(
             f"/api/groups/{group['id']}/conversations/{conv['id']}",
             headers=auth_headers
@@ -456,7 +452,6 @@ class TestGroupsAPI:
         data = response.json()["data"]
         assert conv["id"] not in data["conversationIds"]
         
-        # Verify conversation.group_id is null
         updated_conv = db.get_by_id("conversations", conv["id"])
         assert updated_conv["group_id"] is None
     
@@ -464,7 +459,6 @@ class TestGroupsAPI:
         """Test remove conversation from group owned by another user"""
         db = arango_container_function
         
-        # Create group for other_user
         group = db.create("conversation_groups", {
             "name": "Other's Group",
             "owner_id": other_user["id"],

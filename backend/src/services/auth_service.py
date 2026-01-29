@@ -1,6 +1,12 @@
 """
 Path: backend/src/services/auth_service.py
-Version: 4.0
+Version: 5.0
+
+Changes in v5.0:
+- FIX CRITICAL: change_password() now hashes passwords with SHA256 before bcrypt
+- Consistent with login/register flow: bcrypt(SHA256(password))
+- current_password is hashed with SHA256 before verification
+- new_password is hashed with SHA256 before storing
 
 Changes in v4.0:
 - SECURITY: Adapted to receive password_hash instead of password
@@ -10,14 +16,9 @@ Changes in v4.0:
 
 Changes in v3.3:
 - FIX: SSO response Dict uses camelCase keys (accessToken, tokenType, expiresIn)
-
-Changes in v3.2:
-- FIX: verify_sso_session returns Dict instead of TokenResponse
-
-Changes in v3.1:
-- FIX: Added expires_in=0 to TokenResponse in verify_sso_session()
 """
 
+import hashlib
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
@@ -32,6 +33,11 @@ from src.models.auth import LoginRequest, RegisterRequest, TokenResponse, TokenP
 from src.models.user import UserResponse
 
 logger = logging.getLogger(__name__)
+
+
+def sha256_hash(password: str) -> str:
+    """Compute SHA256 hash of password (same as frontend)"""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
 class AuthService:
@@ -335,10 +341,15 @@ class AuthService:
         """
         Change user password
         
+        SECURITY MODEL:
+        - Receives plaintext passwords from API (PasswordChange model)
+        - Hashes with SHA256 to match stored bcrypt(SHA256) format
+        - This is consistent with register/login flow
+        
         Args:
             user_id: User ID
-            current_password: Current password for verification
-            new_password: New password to set
+            current_password: Current password (plaintext) for verification
+            new_password: New password (plaintext) to set
             
         Returns:
             True if password changed successfully
@@ -355,13 +366,18 @@ class AuthService:
                     detail="User not found"
                 )
             
-            if not verify_password(current_password, user["password_hash"]):
+            # Hash current_password with SHA256 before verifying against bcrypt(SHA256)
+            current_password_sha256 = sha256_hash(current_password)
+            
+            if not verify_password(current_password_sha256, user["password_hash"]):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Current password is incorrect"
                 )
             
-            new_password_hash = hash_password(new_password)
+            # Hash new_password with SHA256, then bcrypt (same as register)
+            new_password_sha256 = sha256_hash(new_password)
+            new_password_hash = hash_password(new_password_sha256)
             
             update_data = {
                 "password_hash": new_password_hash,

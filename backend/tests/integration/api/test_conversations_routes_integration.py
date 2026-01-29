@@ -1,36 +1,42 @@
 """
 Path: backend/tests/integration/api/test_conversations_routes_integration.py
-Version: 3
+Version: 5.0
 
-Changes in v3:
-- FIX: Lines 300, 306 - "timestamp" changed to "created_at"
-- Reason: MessageResponse expects created_at field
+Changes in v5.0:
+- FIX CRITICAL: Use password_hash (SHA256) instead of password for all login calls
+- LoginRequest requires password_hash (64 hex chars), not password
+- Added compute_password_hash() helper function
+- Updated login_user() helper to use password_hash
 
-Changes in v2:
-- FIXED: All db.create() now use snake_case field names
-- owner_id instead of ownerId
-- shared_with_group_ids instead of sharedWithGroupIds
-- group_id instead of groupId
-- created_at instead of createdAt
-- updated_at instead of updatedAt
-- conversation_id instead of conversationId
-
-This matches what the backend code expects internally.
+Changes in v4.0:
+- FIX CRITICAL: Moved 'from src.main import app' INSIDE fixture
 
 Integration tests for conversation management routes
 """
 
 import pytest
+import hashlib
 from datetime import datetime
 from fastapi.testclient import TestClient
 
-from src.main import app
 from src.core.security import hash_password
+
+
+def compute_password_hash(password: str) -> str:
+    """Compute SHA256 hash of password (simulates frontend behavior)"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# Pre-computed SHA256 hash for test password
+ROOT_PASS_HASH = compute_password_hash("RootPass123")
 
 
 @pytest.fixture
 def client(arango_container_function):
     """Test client with database and root user"""
+    # CRITICAL: Import app INSIDE fixture, after container is ready
+    from src.main import app
+    
     db = arango_container_function
     
     # Create collections
@@ -57,7 +63,7 @@ def create_root_user(db):
     return db.create("users", {
         "name": "Root User",
         "email": "root@example.com",
-        "password_hash": hash_password("RootPass123"),
+        "password_hash": hash_password(ROOT_PASS_HASH),
         "role": "root",
         "status": "active",
         "created_at": datetime.utcnow(),
@@ -70,7 +76,7 @@ def create_regular_user(db):
     return db.create("users", {
         "name": "Regular User",
         "email": "user@example.com",
-        "password_hash": hash_password("RootPass123"),
+        "password_hash": hash_password(ROOT_PASS_HASH),
         "role": "user",
         "status": "active",
         "created_at": datetime.utcnow(),
@@ -78,13 +84,16 @@ def create_regular_user(db):
     })
 
 
-def login_user(client, email="root@example.com", password="RootPass123"):
+def login_user(client, email="root@example.com", password_hash=None):
     """Helper to login and get token"""
+    if password_hash is None:
+        password_hash = ROOT_PASS_HASH
+    
     response = client.post("/api/auth/login", json={
         "email": email,
-        "password": password
+        "password_hash": password_hash
     })
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Login failed: {response.text}"
     return response.json()["token"]
 
 
@@ -118,19 +127,19 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         db.create("conversations", {
             "title": "Conv 1",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         db.create("conversations", {
             "title": "Conv 2",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         response = client.get(
@@ -151,11 +160,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Test Conv",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         response = client.get(
@@ -177,11 +186,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Old Title",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         response = client.put(
@@ -203,11 +212,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "To Delete",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         response = client.delete(
@@ -234,11 +243,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "To Share",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         response = client.post(
@@ -262,11 +271,11 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Shared Conv",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": ["group-1", "group-2"],  # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": ["group-1", "group-2"],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         response = client.post(
@@ -289,22 +298,22 @@ class TestConversationRoutes:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Test Conv",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         # Create messages with SNAKE_CASE
         db.create("messages", {
-            "conversation_id": conv["id"],            # Ã¢â€ Â snake_case
+            "conversation_id": conv["id"],
             "role": "user",
             "content": "Hello",
             "created_at": datetime.utcnow()
         })
         db.create("messages", {
-            "conversation_id": conv["id"],            # Ã¢â€ Â snake_case
+            "conversation_id": conv["id"],
             "role": "assistant",
             "content": "Hi there",
             "created_at": datetime.utcnow()
@@ -337,15 +346,15 @@ class TestConversationPermissions:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Root's Conv",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         # Login as user2
-        token = login_user(client, "user@example.com")
+        token = login_user(client, "user@example.com", ROOT_PASS_HASH)
         
         # Try to update
         response = client.put(
@@ -367,15 +376,15 @@ class TestConversationPermissions:
         root_user = db.find_one("users", {"email": "root@example.com"})
         conv = db.create("conversations", {
             "title": "Root's Conv",
-            "owner_id": root_user["id"],              # Ã¢â€ Â snake_case
-            "shared_with_group_ids": [],              # Ã¢â€ Â snake_case
-            "group_id": None,                         # Ã¢â€ Â snake_case
-            "created_at": datetime.utcnow(),          # Ã¢â€ Â snake_case
-            "updated_at": datetime.utcnow()           # Ã¢â€ Â snake_case
+            "owner_id": root_user["id"],
+            "shared_with_group_ids": [],
+            "group_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         })
         
         # Login as user2
-        token = login_user(client, "user@example.com")
+        token = login_user(client, "user@example.com", ROOT_PASS_HASH)
         
         # Try to delete
         response = client.delete(

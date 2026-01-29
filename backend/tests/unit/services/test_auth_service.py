@@ -1,33 +1,21 @@
 """
 Path: backend/tests/unit/services/test_auth_service.py
-Version: 3.1
+Version: 5.0
+
+Changes in v5.0:
+- FIX: test_login_disabled_account expects 403 (not 401)
+- Per specification: disabled accounts return 403 Forbidden
+- 401 is only for invalid credentials (wrong password/email)
+
+Changes in v4.0:
+- FIX: Use password_hash instead of password for RegisterRequest and LoginRequest
+- Models expect SHA256 hash (64 hex chars), not plaintext password
 
 Unit tests for AuthService
-
-Changes in v3.1:
-- FIX: auth_service fixture now passes db argument to AuthService(db=mock_db)
-- AuthService.__init__() requires db parameter
-
-Changes in v3:
-- ADDED: TestAuthServiceSSO class with 2 SSO verification tests
-- Tests use camelCase keys (accessToken, tokenType, expiresIn)
-
-Changes in v2:
-- FIX: test_register_duplicate_email expects 409 (Conflict) not 400
-- FIX: test_login_disabled_account expects 401 (security: generic error message)
-- REMOVED: test_get_auth_config (method doesn't exist in AuthService)
-
-Changes in v1.3:
-- FIX: Syntax error line 156 - removed quotes around 'password' parameter
-- Fixed: "password": "value" Ã¢â€ â€™ password="value"
-
-Changes in v1.2:
-- FIX: Utilise hash bcrypt valide au lieu de "fake_hash"
-- FIX: test_register_duplicate_email - RegisterRequest validation
-- FIX: test_login_disabled_account - Hash correct pour passer password check
 """
 
 import pytest
+import hashlib
 from unittest.mock import Mock
 from fastapi import HTTPException
 
@@ -36,8 +24,25 @@ from src.models.auth import RegisterRequest, LoginRequest
 from tests.unit.mocks.mock_database import MockDatabase
 
 
-# Hash bcrypt prÃƒÆ’Ã‚Â©-calculÃƒÆ’Ã‚Â© pour "StrongPass123"
-VALID_PASSWORD_HASH = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeblhQ7N3OxvKl1yG"
+def compute_sha256(password: str) -> str:
+    """
+    Compute SHA256 hash of password (simulates frontend behavior)
+    
+    Args:
+        password: Plaintext password
+        
+    Returns:
+        64-character hex string (SHA256 hash)
+    """
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# Pre-computed SHA256 hashes for test passwords
+STRONG_PASS_HASH = compute_sha256("StrongPass123")
+CORRECT_PASS_HASH = compute_sha256("CorrectPass123")
+WRONG_PASS_HASH = compute_sha256("WrongPass456")
+ANOTHER_PASS_HASH = compute_sha256("AnotherPass456")
+ANY_PASS_HASH = compute_sha256("AnyPass123")
 
 
 @pytest.fixture
@@ -65,7 +70,7 @@ class TestAuthService:
         request = RegisterRequest(
             name="Test User",
             email="test@example.com",
-            password="StrongPass123"
+            password_hash=STRONG_PASS_HASH
         )
         
         user = auth_service.register(request)
@@ -81,7 +86,7 @@ class TestAuthService:
         request1 = RegisterRequest(
             name="User 1",
             email="duplicate@example.com",
-            password="StrongPass123"
+            password_hash=STRONG_PASS_HASH
         )
         auth_service.register(request1)
         
@@ -89,7 +94,7 @@ class TestAuthService:
         request2 = RegisterRequest(
             name="User 2",
             email="duplicate@example.com",
-            password="AnotherPass456"
+            password_hash=ANOTHER_PASS_HASH
         )
         
         with pytest.raises(HTTPException) as exc_info:
@@ -104,14 +109,14 @@ class TestAuthService:
         register_request = RegisterRequest(
             name="Login Test",
             email="login@example.com",
-            password="StrongPass123"
+            password_hash=STRONG_PASS_HASH
         )
         auth_service.register(register_request)
         
-        # Login
+        # Login with same password hash
         login_request = LoginRequest(
             email="login@example.com",
-            password="StrongPass123"
+            password_hash=STRONG_PASS_HASH
         )
         
         token_response = auth_service.login(login_request)
@@ -126,14 +131,14 @@ class TestAuthService:
         register_request = RegisterRequest(
             name="Test User",
             email="test@example.com",
-            password="CorrectPass123"
+            password_hash=CORRECT_PASS_HASH
         )
         auth_service.register(register_request)
         
         # Try login with wrong password
         login_request = LoginRequest(
             email="test@example.com",
-            password="WrongPass456"
+            password_hash=WRONG_PASS_HASH
         )
         
         with pytest.raises(HTTPException) as exc_info:
@@ -146,7 +151,7 @@ class TestAuthService:
         """Test login with non-existent email"""
         login_request = LoginRequest(
             email="nonexistent@example.com",
-            password="AnyPass123"
+            password_hash=ANY_PASS_HASH
         )
         
         with pytest.raises(HTTPException) as exc_info:
@@ -156,12 +161,15 @@ class TestAuthService:
         assert "invalid" in str(exc_info.value.detail).lower()
     
     def test_login_disabled_account(self, auth_service):
-        """Test login with disabled account"""
-        # Create disabled user with VALID hash
+        """Test login with disabled account returns 403"""
+        # Create disabled user directly in DB
+        # Need to use bcrypt hash of the SHA256 password hash
+        from src.core.security import hash_password
+        
         auth_service.user_repo.db.create("users", {
             "name": "Disabled User",
             "email": "disabled@example.com",
-            "password_hash": VALID_PASSWORD_HASH,  # Hash pour "StrongPass123"
+            "password_hash": hash_password(STRONG_PASS_HASH),
             "role": "user",
             "status": "disabled"
         })
@@ -169,15 +177,17 @@ class TestAuthService:
         # Try to login
         login_request = LoginRequest(
             email="disabled@example.com",
-            password="StrongPass123"
+            password_hash=STRONG_PASS_HASH
         )
         
         with pytest.raises(HTTPException) as exc_info:
             auth_service.login(login_request)
         
-        # Returns 401 with generic message (security: don't reveal account status)
-        assert exc_info.value.status_code == 401
-        assert "invalid" in str(exc_info.value.detail).lower()
+        # Per specification: disabled accounts return 403 Forbidden
+        # 401 is only for invalid credentials (wrong password/email)
+        assert exc_info.value.status_code == 403
+        assert "disabled" in str(exc_info.value.detail).lower()
+
 
 class TestAuthServiceSSO:
     """Test AuthService.verify_sso_session() method"""
@@ -185,12 +195,10 @@ class TestAuthServiceSSO:
     def test_verify_sso_session_existing_user(self, auth_service):
         """Test SSO verification with existing user"""
         # Register user first via regular registration
-        from src.models.auth import RegisterRequest
-        
         register_req = RegisterRequest(
             name="John Doe",
             email="john@example.com",
-            password="StrongPass123"
+            password_hash=STRONG_PASS_HASH
         )
         auth_service.register(register_req)
         
