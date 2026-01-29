@@ -1,5 +1,10 @@
 /* path: frontend/src/components/sidebar/ConversationGroup.tsx
-   version: 4.0
+   version: 4.1
+   
+   Changes in v4.1:
+   - FIX: onConversationRename signature changed to (id: string, currentTitle: string) => void
+   - Reason: Sidebar.handleConversationRename needs the title to prefill the rename modal
+   - Updated onRename call to pass conversation.title
    
    Changes in v4.0:
    - ADDED: onConversationUngroup prop to remove conversations from group
@@ -24,9 +29,9 @@ interface ConversationGroupProps {
   currentConversationId: string | null;
   onConversationClick: (id: string) => void;
   onConversationDelete: (id: string) => void;
-  onConversationRename: (id: string) => void;
+  onConversationRename: (id: string, currentTitle: string) => void; // FIXED: Added currentTitle
   onConversationShare: (id: string) => void;
-  onConversationUngroup: (id: string) => void; // NEW
+  onConversationUngroup: (id: string) => void;
   onGroupDelete: () => void;
   onGroupRename: () => void;
   onConversationDrop?: (conversationId: string, groupId: string) => void;
@@ -143,7 +148,7 @@ export function ConversationGroup({
                 isActive={conversation.id === currentConversationId}
                 onClick={() => onConversationClick(conversation.id)}
                 onDelete={() => onConversationDelete(conversation.id)}
-                onRename={() => onConversationRename(conversation.id)}
+                onRename={() => onConversationRename(conversation.id, conversation.title)}
                 onShare={() => onConversationShare(conversation.id)}
                 onUngroup={() => onConversationUngroup(conversation.id)}
                 onDragStart={onDragStart}

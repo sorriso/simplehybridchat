@@ -1,5 +1,15 @@
 /* path: frontend/src/components/sidebar/ConversationList.tsx
-   version: 9.0
+   version: 9.2
+   
+   Changes in v9.2:
+   - FIX: onGroupRename signature changed to (id: string, currentName: string) => void
+   - Reason: Sidebar.handleGroupRename needs the name to prefill the rename modal
+   - Updated onGroupRename call to pass group.name
+   
+   Changes in v9.1:
+   - FIX: onConversationRename signature changed to (id: string, currentTitle: string) => void
+   - Reason: Sidebar.handleConversationRename needs the title to prefill the rename modal
+   - Updated all onRename calls to pass conversation.title
    
    Changes in v9.0:
    - ADDED: Support for ungrouping conversations via onUngroup handler
@@ -24,10 +34,10 @@ interface ConversationListProps {
   currentUserId?: string;
   onConversationClick: (id: string) => void;
   onConversationDelete: (id: string) => void;
-  onConversationRename: (id: string) => void;
+  onConversationRename: (id: string, currentTitle: string) => void; // FIXED: Added currentTitle
   onConversationShare: (id: string) => void;
   onGroupDelete: (id: string) => void;
-  onGroupRename: (id: string) => void;
+  onGroupRename: (id: string, currentName: string) => void; // FIXED: Added currentName
   onMoveConversationToGroup?: (conversationId: string, groupId: string | null) => void;
 }
 
@@ -120,7 +130,7 @@ export function ConversationList({
                 isActive={conversation.id === currentConversationId}
                 onClick={() => onConversationClick(conversation.id)}
                 onDelete={() => onConversationDelete(conversation.id)}
-                onRename={() => onConversationRename(conversation.id)}
+                onRename={() => onConversationRename(conversation.id, conversation.title)}
                 readOnly={true}
               />
             ))}
@@ -141,7 +151,7 @@ export function ConversationList({
           onConversationShare={onConversationShare}
           onConversationUngroup={handleUngroup}
           onGroupDelete={() => onGroupDelete(group.id)}
-          onGroupRename={() => onGroupRename(group.id)}
+          onGroupRename={() => onGroupRename(group.id, group.name)}
           onConversationDrop={handleDrop}
           draggingConversationId={draggingConversationId}
           onDragStart={handleDragStart}
@@ -180,7 +190,7 @@ export function ConversationList({
                 isActive={conversation.id === currentConversationId}
                 onClick={() => onConversationClick(conversation.id)}
                 onDelete={() => onConversationDelete(conversation.id)}
-                onRename={() => onConversationRename(conversation.id)}
+                onRename={() => onConversationRename(conversation.id, conversation.title)}
                 onShare={() => onConversationShare(conversation.id)}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
